@@ -1,0 +1,25 @@
+package lexer
+
+type TokenType int
+
+const (
+	ILLEGAL TokenType = iota
+
+	BOOLEAN
+	INTEGER
+	FLOAT
+	STRING
+
+	IDENTIFIER
+
+	COMMENT
+	OPEN_PAREN
+	CLOSED_PAREN
+	OPEN_BRACKET
+	CLOSED_BRACKET
+	OPEN_BRACE
+	CLOSED_BRACE
+
+	COMMA
+	DOT
+)
