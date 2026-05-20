@@ -1,51 +1,116 @@
 package lexer
 
+import "unicode"
+
+func IsAlphanumeric(s rune) bool {
+	if !unicode.IsLetter(s) && !unicode.IsDigit(s) {
+		return false
+	}
+	return true
+}
+
+func IsDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
 type Lexer struct {
-	input  []rune
-	output []LexerToken
-	pos    int
+	Input  []rune
+	Output []LexerToken
+	Pos    int
 }
 
 func (l *Lexer) Set(s string) {
-	l.input = []rune(s)
+	l.Input = []rune(s)
+}
+
+func (l *Lexer) Get() []LexerToken {
+	return l.Output
 }
 
 func (l *Lexer) Consume() rune {
-	ch := l.input[l.pos]
-	l.pos++
+	ch := l.Input[l.Pos]
+	l.Pos++
 	return ch
 }
 
 func (l *Lexer) AddToken(_name string, _type TokenType, _line int) {
 	new_token := NewToken(_name, _type, _line)
-	l.output = append(l.output, new_token)
+	l.Output = append(l.Output, new_token)
 }
 
 func (l *Lexer) Current() rune {
-	return l.input[l.pos]
+	return l.Input[l.Pos]
+}
+
+func (l *Lexer) Peek() rune {
+	if l.Pos+1 >= len(l.Input) {
+		return 0
+	}
+	return l.Input[l.Pos+1]
 }
 
 func (l *Lexer) AtEnd() bool {
-	return l.pos >= len(l.input)
+	return l.Pos >= len(l.Input)
 }
 
 func (l *Lexer) readString(line int) {
 	// skip opening quote
 	l.Consume()
 
-	start := l.pos
+	start := l.Pos
 
 	for !l.AtEnd() && l.Current() != '"' {
 		l.Consume()
 	}
 
 	// slice the runes between quotes
-	value := string(l.input[start:l.pos])
+	value := string(l.Input[start:l.Pos])
 
 	// skip closing quote
 	l.Consume()
 
 	l.AddToken(value, STRING, line)
+}
+
+func (l *Lexer) readNamespace(line int) {
+	value := ""
+	start := l.Pos
+
+	for !l.AtEnd() && (IsAlphanumeric(l.Current()) || l.Current() == '_') {
+		l.Consume()
+	}
+
+	value = string(l.Input[start:l.Pos])
+
+	l.AddToken(value, IDENTIFIER, line)
+}
+
+func (l *Lexer) readNumber(line int) {
+	start := l.Pos
+	isFloat := false
+
+	// read leading digits
+	for !l.AtEnd() && IsDigit(l.Current()) {
+		l.Consume()
+	}
+
+	// check for decimal part
+	if !l.AtEnd() && l.Current() == '.' && IsDigit(l.Peek()) {
+		isFloat = true
+		l.Consume() // consume '.'
+
+		for !l.AtEnd() && IsDigit(l.Current()) {
+			l.Consume()
+		}
+	}
+
+	value := string(l.Input[start:l.Pos])
+
+	if isFloat {
+		l.AddToken(value, FLOAT, line)
+	} else {
+		l.AddToken(value, INTEGER, line)
+	}
 }
 
 func (l *Lexer) Tokenize() {
@@ -54,27 +119,99 @@ func (l *Lexer) Tokenize() {
 	for !l.AtEnd() {
 		ch := l.Current()
 
-		// whitespace
+		// handle whitespace
 		if ch == ' ' || ch == '\t' {
 			l.Consume()
 			continue
 		}
 
-		// newline
+		// handle new-line
 		if ch == '\n' {
 			line++
 			l.Consume()
 			continue
 		}
 
-		// string
+		// handle string
 		if ch == '"' {
 			l.readString(line)
 			continue
 		}
 
-		// TODO: other tokens here
+		// handle namespace
+		if IsAlphanumeric(l.Current()) {
+			l.readNamespace(line)
+			continue
+		}
 
-		l.Consume()
+		// handle assign
+		if l.Current() == '=' {
+			l.Consume()
+			l.AddToken("=", ASSIGN, line)
+			continue
+		}
+
+		//handle dot
+		if l.Current() == '.' {
+			l.Consume()
+			l.AddToken(".", DOT, line)
+			continue
+		}
+
+		//handle comma
+		if l.Current() == ',' {
+			l.Consume()
+			l.AddToken(",", COMMA, line)
+			continue
+		}
+
+		// handle opened paren
+		if l.Current() == '(' {
+			l.Consume()
+			l.AddToken("(", OPEN_PAREN, line)
+			continue
+		}
+
+		// handle closed paren
+		if l.Current() == ')' {
+			l.Consume()
+			l.AddToken(")", CLOSED_PAREN, line)
+			continue
+		}
+
+		// handle opened bracket
+		if l.Current() == '[' {
+			l.Consume()
+			l.AddToken("[", OPEN_BRACKET, line)
+			continue
+		}
+
+		// handle closed paren
+		if l.Current() == ']' {
+			l.Consume()
+			l.AddToken("]", CLOSED_BRACKET, line)
+			continue
+		}
+
+		// handle opened brace
+		if l.Current() == '{' {
+			l.Consume()
+			l.AddToken("{", OPEN_BRACE, line)
+			continue
+		}
+
+		// handle closed brace
+		if l.Current() == '}' {
+			l.Consume()
+			l.AddToken("}", CLOSED_BRACE, line)
+			continue
+		}
+
+		// handle integer
+		if IsDigit(l.Current()) {
+			l.readNumber(line)
+			continue
+		}
+
 	}
 }
