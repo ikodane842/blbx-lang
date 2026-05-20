@@ -113,6 +113,50 @@ func (l *Lexer) readNumber(line int) {
 	}
 }
 
+func (l *Lexer) readSingleLineComment(line int) {
+	// skip //
+	l.Consume()
+	l.Consume()
+
+	start := l.Pos
+
+	for !l.AtEnd() && l.Current() != '\n' {
+		l.Consume()
+	}
+
+	value := string(l.Input[start:l.Pos])
+
+	l.AddToken(value, COMMENT, line)
+}
+
+func (l *Lexer) readMultiLineComment(line *int) {
+	// skip /*
+	l.Consume()
+	l.Consume()
+
+	start := l.Pos
+
+	for !l.AtEnd() {
+		if l.Current() == '\n' {
+			(*line)++
+		}
+
+		// detect */
+		if l.Current() == '*' && l.Peek() == '/' {
+			value := string(l.Input[start:l.Pos])
+
+			// consume */
+			l.Consume()
+			l.Consume()
+
+			l.AddToken(value, COMMENT, *line)
+			return
+		}
+
+		l.Consume()
+	}
+}
+
 func (l *Lexer) Tokenize() {
 	line := 1
 
@@ -213,5 +257,18 @@ func (l *Lexer) Tokenize() {
 			continue
 		}
 
+		// handle slinge-line comment
+		if l.Current() == '/' && l.Peek() == '/' {
+			l.readSingleLineComment(line)
+			continue
+		}
+
+		// handle multi-line comment
+		if l.Current() == '/' && l.Peek() == '*' {
+			l.readMultiLineComment(&line)
+			continue
+		}
+
+		l.Consume()
 	}
 }
