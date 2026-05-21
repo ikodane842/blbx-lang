@@ -7,7 +7,6 @@ const (
 
 	BOOLEAN
 	INTEGER
-	FLOAT
 	STRING
 
 	IDENTIFIER

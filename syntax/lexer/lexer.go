@@ -195,6 +195,12 @@ func (l *Lexer) Tokenize() {
 			continue
 		}
 
+		if l.Current() == ':' {
+			l.Consume()
+			l.AddToken(":", ASSIGN, line)
+			continue
+		}
+
 		//handle dot
 		if l.Current() == '.' {
 			l.Consume()

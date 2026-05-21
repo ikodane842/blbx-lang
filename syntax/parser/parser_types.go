@@ -1,0 +1,24 @@
+package parser
+
+type ParserType int
+
+const (
+	ILLEGAL ParserType = iota
+
+	FUNCTION_SCOPE
+	OBJECT_SCOPE
+	CLASS_SCOPE
+
+	FUNCTION_CALL
+	NAMESPACE
+
+	ARRAY
+	SINGLETON
+	TUPLE
+
+	LOOP_NODE
+	FOR_LOOP
+	WHILE_LOOP
+
+	FLOAT
+)

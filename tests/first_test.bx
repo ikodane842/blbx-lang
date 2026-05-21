@@ -1,3 +1,56 @@
 string_one = "this is a string"
 integer = 4590
 float = 4590.252
+
+object = {
+    "age": 22
+}
+
+object.name = "cool object"
+
+array = [1, 2, "three", 4, 5]
+
+singleton = (array[2]).concat(", sevenths")
+
+tuple = ("one", 2, 3, ["illegal"])
+
+function_declaration = (param_one = true) => {
+    return param_one
+}
+
+function_call = function_declaration()
+
+if(
+    function_call,
+    () => {
+        print(function_call)
+    },
+    () => {
+        print("function_call failed...")
+    }
+)
+
+for(
+    array,
+    (__) => {
+        if(
+            (__.elem()).eq("three"),
+            () => { __.continue() },
+            () => { print((__.elem()).type()) }
+        )
+    }
+)
+
+while(
+    (array.length()).eq(4),
+    () => {
+        print("hello world")
+    }
+)
+
+// comment one
+
+/*
+ comment 
+ two
+*/

@@ -1,0 +1,13 @@
+ - the Parsing layer will contain parsing for scopes (SCOPE) denoted by curly brackets
+ this will be used for object, class, and function declaration 
+    FUNCTION_SCOPE, OBJECT_SCOPE, CLASS_SCOPE
+
+ - the IR layer will contain parsing for specific branching function calls, 
+ loop functtion calls and regular function calls
+    BRANCH & FUNCTION_CALL & FOR_LOOP & WHILE_LOOP
+
+ - the IR layer will handle indexing 
+ `(array[2]).concat(", sevenths")`
+
+ - the IR layer will handle abstracted classes 
+ like singletons and Loop Nodes (`__`) 
