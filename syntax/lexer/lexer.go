@@ -87,30 +87,15 @@ func (l *Lexer) readNamespace(line int) {
 
 func (l *Lexer) readNumber(line int) {
 	start := l.Pos
-	isFloat := false
 
 	// read leading digits
 	for !l.AtEnd() && IsDigit(l.Current()) {
 		l.Consume()
 	}
 
-	// check for decimal part
-	if !l.AtEnd() && l.Current() == '.' && IsDigit(l.Peek()) {
-		isFloat = true
-		l.Consume() // consume '.'
-
-		for !l.AtEnd() && IsDigit(l.Current()) {
-			l.Consume()
-		}
-	}
-
 	value := string(l.Input[start:l.Pos])
 
-	if isFloat {
-		l.AddToken(value, FLOAT, line)
-	} else {
-		l.AddToken(value, INTEGER, line)
-	}
+	l.AddToken(value, INTEGER, line)
 }
 
 func (l *Lexer) readSingleLineComment(line int) {
