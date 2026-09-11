@@ -2,8 +2,10 @@ package main
 
 import (
 	"blbx_lang/syntax/lexer"
-	"fmt"
+	"blbx_lang/syntax/parser"
+	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -20,12 +22,33 @@ func main() {
 	// run tokenizer
 	l.Tokenize()
 
-	// print tokens
-	for _, tok := range l.Get() {
-		fmt.Printf("Line %-3d | %-10s | %q\n",
-			tok.Line,
-			tok.Type, // will print nicely if you added String() to TokenType
-			tok.Name,
-		)
+	// create parser
+
+	var p parser.Parser
+	p.Set(l.Get())
+
+	// run parser
+	p.Parse()
+
+	writeJSON(filepath.Join("tests", "output", "first_test_output.json"), p.Get())
+}
+
+func writeJSON(outputPath string, value interface{}) {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		panic(err)
+	}
+
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		panic(err)
+	}
+	defer outputFile.Close()
+
+	encoder := json.NewEncoder(outputFile)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(value); err != nil {
+		panic(err)
 	}
 }

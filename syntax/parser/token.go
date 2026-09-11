@@ -7,11 +7,11 @@ type Node struct {
 	Children []Node
 }
 
-func NewToken(_name string, _type ParserType, _line int) Node {
+func NewToken(_name string, _type ParserType, _line int, _children []Node) Node {
 	return Node{
-		Name: _name,
-		Type: _type,
-		Line: _line,
-		Children: []Node
+		Name:     _name,
+		Type:     _type,
+		Line:     _line,
+		Children: _children,
 	}
 }

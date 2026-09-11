@@ -1,0 +1,665 @@
+{
+  "type": "PROGRAM",
+  "children": [
+    {
+      "type": "ASSIGN",
+      "name": "string_one",
+      "line": 1,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "string_one",
+          "line": 1
+        },
+        {
+          "type": "LITERAL",
+          "value": "this is a string",
+          "dataType": "string",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "integer",
+      "line": 2,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "integer",
+          "line": 2
+        },
+        {
+          "type": "LITERAL",
+          "value": "4590",
+          "dataType": "integer",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "float",
+      "line": 3,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "float",
+          "line": 3
+        },
+        {
+          "type": "LITERAL",
+          "value": "4590.252",
+          "dataType": "float",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "object",
+      "line": 5,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "object",
+          "line": 5
+        },
+        {
+          "type": "BLOCK",
+          "line": 5,
+          "children": [
+            {
+              "type": "ASSIGN",
+              "line": 6,
+              "children": [
+                {
+                  "type": "LITERAL",
+                  "value": "age",
+                  "dataType": "string",
+                  "line": 6
+                },
+                {
+                  "type": "LITERAL",
+                  "value": "22",
+                  "dataType": "integer",
+                  "line": 6
+                }
+              ]
+            },
+            {
+              "type": "ASSIGN",
+              "line": 7,
+              "children": [
+                {
+                  "type": "LITERAL",
+                  "value": "birth",
+                  "dataType": "string",
+                  "line": 7
+                },
+                {
+                  "type": "LITERAL",
+                  "value": "2004",
+                  "dataType": "integer",
+                  "line": 7
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "line": 10,
+      "children": [
+        {
+          "type": "MEMBER",
+          "name": "name",
+          "line": 10,
+          "children": [
+            {
+              "type": "IDENTIFIER",
+              "name": "object",
+              "line": 10
+            },
+            {
+              "type": "IDENTIFIER",
+              "name": "name",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "type": "LITERAL",
+          "value": "cool object",
+          "dataType": "string",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "array",
+      "line": 12,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "array",
+          "line": 12
+        },
+        {
+          "type": "ARRAY",
+          "name": "array",
+          "line": 12,
+          "children": [
+            {
+              "type": "LITERAL",
+              "value": "1",
+              "dataType": "integer",
+              "line": 12
+            },
+            {
+              "type": "LITERAL",
+              "value": "2",
+              "dataType": "integer",
+              "line": 12
+            },
+            {
+              "type": "LITERAL",
+              "value": "three",
+              "dataType": "string",
+              "line": 12
+            },
+            {
+              "type": "LITERAL",
+              "value": "4",
+              "dataType": "integer",
+              "line": 12
+            },
+            {
+              "type": "LITERAL",
+              "value": "5",
+              "dataType": "integer",
+              "line": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "singleton",
+      "line": 14,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "singleton",
+          "line": 14
+        },
+        {
+          "type": "CALL",
+          "name": "concat",
+          "line": 14,
+          "children": [
+            {
+              "type": "MEMBER",
+              "name": "concat",
+              "line": 14,
+              "children": [
+                {
+                  "type": "INDEX",
+                  "name": "index",
+                  "line": 14,
+                  "children": [
+                    {
+                      "type": "IDENTIFIER",
+                      "name": "array",
+                      "line": 14
+                    },
+                    {
+                      "type": "LITERAL",
+                      "value": "2",
+                      "dataType": "integer",
+                      "line": 14
+                    }
+                  ]
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "concat",
+                  "line": 14
+                }
+              ]
+            },
+            {
+              "type": "LITERAL",
+              "value": ", sevenths",
+              "dataType": "string",
+              "line": 14
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "tuple",
+      "line": 16,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "tuple",
+          "line": 16
+        },
+        {
+          "type": "TUPLE",
+          "name": "tuple",
+          "line": 16,
+          "children": [
+            {
+              "type": "LITERAL",
+              "value": "one",
+              "dataType": "string",
+              "line": 16
+            },
+            {
+              "type": "LITERAL",
+              "value": "2",
+              "dataType": "integer",
+              "line": 16
+            },
+            {
+              "type": "LITERAL",
+              "value": "3",
+              "dataType": "integer",
+              "line": 16
+            },
+            {
+              "type": "ARRAY",
+              "name": "array",
+              "line": 16,
+              "children": [
+                {
+                  "type": "LITERAL",
+                  "value": "illegal",
+                  "dataType": "string",
+                  "line": 16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "function_declaration",
+      "line": 18,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "function_declaration",
+          "line": 18
+        },
+        {
+          "type": "FUNCTION",
+          "name": "function_declaration",
+          "line": 18,
+          "children": [
+            {
+              "type": "ASSIGN",
+              "name": "param_one",
+              "line": 18,
+              "children": [
+                {
+                  "type": "IDENTIFIER",
+                  "name": "param_one",
+                  "line": 18
+                },
+                {
+                  "type": "LITERAL",
+                  "value": "true",
+                  "dataType": "boolean",
+                  "line": 18
+                }
+              ]
+            },
+            {
+              "type": "BLOCK",
+              "line": 18,
+              "children": [
+                {
+                  "type": "IDENTIFIER",
+                  "name": "return",
+                  "line": 19
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "param_one",
+                  "line": 19
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "name": "function_call",
+      "line": 22,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "function_call",
+          "line": 22
+        },
+        {
+          "type": "CALL",
+          "name": "function_declaration",
+          "line": 22
+        }
+      ]
+    },
+    {
+      "type": "IF",
+      "name": "if",
+      "line": 24,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "function_call",
+          "line": 25
+        },
+        {
+          "type": "ASSIGN",
+          "line": 26,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 26
+            },
+            {
+              "type": "BLOCK",
+              "line": 26,
+              "children": [
+                {
+                  "type": "CALL",
+                  "name": "print",
+                  "line": 27,
+                  "children": [
+                    {
+                      "type": "IDENTIFIER",
+                      "name": "function_call",
+                      "line": 27
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ASSIGN",
+          "line": 29,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 29
+            },
+            {
+              "type": "BLOCK",
+              "line": 29,
+              "children": [
+                {
+                  "type": "CALL",
+                  "name": "print",
+                  "line": 30,
+                  "children": [
+                    {
+                      "type": "LITERAL",
+                      "value": "function_call failed...",
+                      "dataType": "string",
+                      "line": 30
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "FOR",
+      "name": "for",
+      "line": 34,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "array",
+          "line": 35
+        },
+        {
+          "type": "ASSIGN",
+          "line": 36,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 36
+            },
+            {
+              "type": "BLOCK",
+              "line": 36,
+              "children": [
+                {
+                  "type": "IF",
+                  "name": "if",
+                  "line": 37,
+                  "children": [
+                    {
+                      "type": "TUPLE",
+                      "name": "tuple",
+                      "line": 38
+                    }
+                  ]
+                },
+                {
+                  "type": "CALL",
+                  "name": "elem",
+                  "line": 38
+                },
+                {
+                  "type": "CALL",
+                  "name": "eq",
+                  "line": 38,
+                  "children": [
+                    {
+                      "type": "MEMBER",
+                      "name": "eq",
+                      "line": 38,
+                      "children": [
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "eq",
+                          "line": 38
+                        }
+                      ]
+                    },
+                    {
+                      "type": "LITERAL",
+                      "value": "three",
+                      "dataType": "string",
+                      "line": 38
+                    }
+                  ]
+                },
+                {
+                  "type": "ASSIGN",
+                  "line": 39,
+                  "children": [
+                    {
+                      "type": "CALL"
+                    },
+                    {
+                      "type": "BLOCK",
+                      "line": 39,
+                      "children": [
+                        {
+                          "type": "CALL",
+                          "name": "continue",
+                          "line": 39
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "ASSIGN",
+                  "line": 40,
+                  "children": [
+                    {
+                      "type": "CALL"
+                    },
+                    {
+                      "type": "BLOCK",
+                      "line": 40,
+                      "children": [
+                        {
+                          "type": "CALL",
+                          "name": "print",
+                          "line": 40,
+                          "children": [
+                            {
+                              "type": "TUPLE",
+                              "name": "tuple",
+                              "line": 40
+                            }
+                          ]
+                        },
+                        {
+                          "type": "CALL",
+                          "name": "elem",
+                          "line": 40
+                        },
+                        {
+                          "type": "CALL",
+                          "name": "type",
+                          "line": 40,
+                          "children": [
+                            {
+                              "type": "MEMBER",
+                              "name": "type",
+                              "line": 40,
+                              "children": [
+                                {
+                                  "type": "IDENTIFIER",
+                                  "name": "type",
+                                  "line": 40
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "WHILE",
+      "name": "while",
+      "line": 45,
+      "children": [
+        {
+          "type": "CALL",
+          "name": "eq",
+          "line": 46,
+          "children": [
+            {
+              "type": "MEMBER",
+              "name": "eq",
+              "line": 46,
+              "children": [
+                {
+                  "type": "CALL",
+                  "name": "length",
+                  "line": 46,
+                  "children": [
+                    {
+                      "type": "MEMBER",
+                      "name": "length",
+                      "line": 46,
+                      "children": [
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "array",
+                          "line": 46
+                        },
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "length",
+                          "line": 46
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "eq",
+                  "line": 46
+                }
+              ]
+            },
+            {
+              "type": "LITERAL",
+              "value": "4",
+              "dataType": "integer",
+              "line": 46
+            }
+          ]
+        },
+        {
+          "type": "ASSIGN",
+          "line": 47,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 47
+            },
+            {
+              "type": "BLOCK",
+              "line": 47,
+              "children": [
+                {
+                  "type": "CALL",
+                  "name": "print",
+                  "line": 48,
+                  "children": [
+                    {
+                      "type": "LITERAL",
+                      "value": "hello world",
+                      "dataType": "string",
+                      "line": 48
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

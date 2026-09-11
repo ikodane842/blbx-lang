@@ -1,0 +1,84 @@
+when the parse gives the IR the object below:
+
+{
+      "type": "ASSIGN",
+      "name": "singleton",
+      "line": 13,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "singleton",
+          "line": 13
+        },
+        {
+          "type": "CALL",
+          "name": "concat",
+          "line": 13,
+          "children": [
+            {
+              "type": "MEMBER",
+              "name": "concat",
+              "line": 13,
+              "children": [
+                {
+                  "type": "INDEX",
+                  "name": "index",
+                  "line": 13,
+                  "children": [
+                    {
+                      "type": "IDENTIFIER",
+                      "name": "array",
+                      "line": 13
+                    },
+                    {
+                      "type": "LITERAL",
+                      "value": "2",
+                      "dataType": "integer",
+                      "line": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "concat",
+                  "line": 13
+                }
+              ]
+            },
+            {
+              "type": "LITERAL",
+              "value": ", sevenths",
+              "dataType": "string",
+              "line": 13
+            }
+          ]
+        }
+      ]
+    },
+
+    it should turn it into data that displays that its a singleton.
+
+    singleton = (array[2]).concat(", sevenths")
+
+    so IR should be 
+
+    Assign{
+        "type": "ASSIGN",
+        "name": "singleton",
+        "line": _,
+        children: [
+            {
+                "type": "IDENTIFIER",
+                "name": "singleton",
+                "line": _,
+            },
+            {
+                type: "CALL"
+                "name":"concat",
+                line: _
+            },
+            {
+                "type
+            }
+        ]
+    }

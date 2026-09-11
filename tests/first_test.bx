@@ -3,12 +3,13 @@ integer = 4590
 float = 4590.252
 
 object = {
-    "age": 22
+    "age": 22,
+    "birth": 2004,
 }
 
 object.name = "cool object"
 
-array = [1, 2, "three", 4, 5]
+array = [1, 2, "three", ["TEST"], 4, 5]
 
 singleton = (array[2]).concat(", sevenths")
 

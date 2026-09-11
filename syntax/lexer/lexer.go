@@ -87,13 +87,28 @@ func (l *Lexer) readNamespace(line int) {
 
 func (l *Lexer) readNumber(line int) {
 	start := l.Pos
+	isFloat := false
 
 	// read leading digits
 	for !l.AtEnd() && IsDigit(l.Current()) {
 		l.Consume()
 	}
 
+	if !l.AtEnd() && l.Current() == '.' && IsDigit(l.Peek()) {
+		isFloat = true
+		l.Consume()
+
+		for !l.AtEnd() && IsDigit(l.Current()) {
+			l.Consume()
+		}
+	}
+
 	value := string(l.Input[start:l.Pos])
+
+	if isFloat {
+		l.AddToken(value, FLOAT, line)
+		return
+	}
 
 	l.AddToken(value, INTEGER, line)
 }
@@ -167,9 +182,11 @@ func (l *Lexer) Tokenize() {
 			continue
 		}
 
-		// handle namespace
-		if IsAlphanumeric(l.Current()) {
-			l.readNamespace(line)
+		// handle arrow assign
+		if l.Current() == '=' && l.Peek() == '>' {
+			l.Consume()
+			l.Consume()
+			l.AddToken("=>", ASSIGN, line)
 			continue
 		}
 
@@ -245,6 +262,12 @@ func (l *Lexer) Tokenize() {
 		// handle integer
 		if IsDigit(l.Current()) {
 			l.readNumber(line)
+			continue
+		}
+
+		// handle namespace
+		if IsAlphanumeric(l.Current()) {
+			l.readNamespace(line)
 			continue
 		}
 
