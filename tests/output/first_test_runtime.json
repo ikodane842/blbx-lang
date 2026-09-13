@@ -1,0 +1,38 @@
+{
+  "output": [
+    "stand",
+    "up",
+    "and",
+    "fight",
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "globals": {
+    "list": {
+      "kind": "array",
+      "value": [
+        {
+          "kind": "string",
+          "value": "stand"
+        },
+        {
+          "kind": "string",
+          "value": "up"
+        },
+        {
+          "kind": "string",
+          "value": "and"
+        },
+        {
+          "kind": "string",
+          "value": "fight"
+        }
+      ]
+    }
+  },
+  "last": {
+    "kind": "null"
+  }
+}

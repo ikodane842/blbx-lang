@@ -1,57 +1,20 @@
-string_one = "this is a string"
-integer = 4590
-float = 4590.252
+list = [
+    "stand",
+    "up",
+    "and",
+    "fight"
+]
 
-object = {
-    "age": 22,
-    "birth": 2004,
-}
-
-object.name = "cool object"
-
-array = [1, 2, "three", ["TEST"], 4, 5]
-
-singleton = (array[2]).concat(", sevenths")
-
-tuple = ("one", 2, 3, ["illegal"])
-
-function_declaration = (param_one = true) => {
-    return param_one
-}
-
-function_call = function_declaration()
-
-if(
-    function_call,
-    () => {
-        print(function_call)
-    },
-    () => {
-        print("function_call failed...")
+for(
+    list,
+    (__) => {
+        print(__.elem())
     }
 )
 
 for(
-    array,
+    list,
     (__) => {
-        if(
-            (__.elem()).eq("three"),
-            () => { __.continue() },
-            () => { print((__.elem()).type()) }
-        )
+        print(__.index())
     }
 )
-
-while(
-    (array.length()).eq(4),
-    () => {
-        print("hello world")
-    }
-)
-
-// comment one
-
-/*
- comment 
- two
-*/

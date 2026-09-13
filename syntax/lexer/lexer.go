@@ -13,6 +13,10 @@ func IsDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
 
+func IsIdentifierStart(r rune) bool {
+	return unicode.IsLetter(r) || r == '_'
+}
+
 type Lexer struct {
 	Input  []rune
 	Output []LexerToken
@@ -81,6 +85,15 @@ func (l *Lexer) readNamespace(line int) {
 	}
 
 	value = string(l.Input[start:l.Pos])
+
+	switch value {
+	case "return":
+		l.AddToken(value, RETURN, line)
+		return
+	case "assert":
+		l.AddToken(value, ASSERT, line)
+		return
+	}
 
 	l.AddToken(value, IDENTIFIER, line)
 }
@@ -210,6 +223,19 @@ func (l *Lexer) Tokenize() {
 			continue
 		}
 
+		if l.Current() == '*' && l.Peek() == '*' {
+			l.Consume()
+			l.Consume()
+			l.AddToken("**", IDENTIFIER, line)
+			continue
+		}
+
+		if l.Current() == '*' {
+			l.Consume()
+			l.AddToken("*", STAR, line)
+			continue
+		}
+
 		//handle comma
 		if l.Current() == ',' {
 			l.Consume()
@@ -266,7 +292,7 @@ func (l *Lexer) Tokenize() {
 		}
 
 		// handle namespace
-		if IsAlphanumeric(l.Current()) {
+		if IsIdentifierStart(l.Current()) {
 			l.readNamespace(line)
 			continue
 		}

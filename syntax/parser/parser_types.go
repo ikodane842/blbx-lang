@@ -20,6 +20,7 @@ const (
 	// expressions
 	FUNCTION_CALL
 	INDEX
+	BINARY_EXPR
 	ARRAY_LITERAL
 	TUPLE_LITERAL
 
@@ -27,6 +28,7 @@ const (
 	VARIABLE_DECL
 	ASSIGNMENT
 	RETURN_STATEMENT
+	ASSERT_STATEMENT
 
 	// blocks/scopes
 	BLOCK
@@ -57,6 +59,8 @@ func (pt ParserType) String() string {
 		return "FUNCTION_CALL"
 	case INDEX:
 		return "INDEX"
+	case BINARY_EXPR:
+		return "BINARY_EXPR"
 	case ARRAY_LITERAL:
 		return "ARRAY_LITERAL"
 	case TUPLE_LITERAL:
@@ -67,6 +71,8 @@ func (pt ParserType) String() string {
 		return "ASSIGNMENT"
 	case RETURN_STATEMENT:
 		return "RETURN_STATEMENT"
+	case ASSERT_STATEMENT:
+		return "ASSERT_STATEMENT"
 	case BLOCK:
 		return "BLOCK"
 	case FUNCTION_DECL:

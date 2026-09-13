@@ -1,6 +1,9 @@
 package parser
 
-import "blbx_lang/syntax/lexer"
+import (
+	"blbx_lang/syntax/lexer"
+	"log"
+)
 
 type Parser struct {
 	Input  []lexer.LexerToken
@@ -45,8 +48,23 @@ func (p *Parser) Set(tokens []lexer.LexerToken) {
 }
 
 func (p *Parser) Expect(tt lexer.TokenType) {
-	if p.AtEnd() || p.Current().Type != tt {
-		return
+	if p.AtEnd() {
+		log.Fatalf(
+			"syntax error: expected %v, got EOF",
+			tt,
+		)
+	}
+
+	if p.Current().Type != tt {
+		tok := p.Current()
+
+		log.Fatalf(
+			"[blbx][syntax]: error at line %d; expected %v, got %v (%q)",
+			tok.Line,
+			tt,
+			tok.Type,
+			tok.Name,
+		)
 	}
 
 	p.Consume()
@@ -59,6 +77,12 @@ func (p *Parser) match(tt lexer.TokenType) bool {
 
 	p.Consume()
 	return true
+}
+
+func (p *Parser) skipComments() {
+	for !p.AtEnd() && p.Current().Type == lexer.COMMENT {
+		p.Consume()
+	}
 }
 
 func (p *Parser) parseString() Node {
@@ -120,6 +144,11 @@ func (p *Parser) parseArguments() []Node {
 	args := []Node{}
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_PAREN {
+		p.skipComments()
+		if p.AtEnd() || p.Current().Type == lexer.CLOSED_PAREN {
+			break
+		}
+
 		start := p.Pos
 		arg := p.parseStatement()
 		if arg.Type != ILLEGAL {
@@ -130,6 +159,7 @@ func (p *Parser) parseArguments() []Node {
 			p.Consume()
 		}
 
+		p.skipComments()
 		if !p.match(lexer.COMMA) {
 			break
 		}
@@ -151,11 +181,28 @@ func (p *Parser) parseFunctionCall() Node {
 	}
 }
 
+func (p *Parser) parseAssert() Node {
+	tok := p.Consume()
+	p.Expect(lexer.OPEN_PAREN)
+
+	return NewToken(
+		tok.Name,
+		ASSERT_STATEMENT,
+		tok.Line,
+		p.parseArguments(),
+	)
+}
+
 func (p *Parser) parseArrayLiteral() Node {
 	tok := p.Consume()
 	items := []Node{}
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_BRACKET {
+		p.skipComments()
+		if p.AtEnd() || p.Current().Type == lexer.CLOSED_BRACKET {
+			break
+		}
+
 		start := p.Pos
 		item := p.parseExpression()
 		if item.Type != ILLEGAL {
@@ -166,6 +213,7 @@ func (p *Parser) parseArrayLiteral() Node {
 			p.Consume()
 		}
 
+		p.skipComments()
 		if !p.match(lexer.COMMA) {
 			break
 		}
@@ -180,6 +228,11 @@ func (p *Parser) parseBlock() Node {
 	body := []Node{}
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_BRACE {
+		p.skipComments()
+		if p.AtEnd() || p.Current().Type == lexer.CLOSED_BRACE {
+			break
+		}
+
 		start := p.Pos
 		stmt := p.parseStatement()
 		if stmt.Type != ILLEGAL {
@@ -200,6 +253,11 @@ func (p *Parser) parseParenExpression() Node {
 	items := []Node{}
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_PAREN {
+		p.skipComments()
+		if p.AtEnd() || p.Current().Type == lexer.CLOSED_PAREN {
+			break
+		}
+
 		start := p.Pos
 		item := p.parseStatement()
 		if item.Type != ILLEGAL {
@@ -210,6 +268,7 @@ func (p *Parser) parseParenExpression() Node {
 			p.Consume()
 		}
 
+		p.skipComments()
 		if !p.match(lexer.COMMA) {
 			break
 		}
@@ -230,6 +289,8 @@ func (p *Parser) parsePrimary() Node {
 	}
 
 	switch p.Current().Type {
+	case lexer.ASSERT:
+		return p.parseAssert()
 	case lexer.IDENTIFIER:
 		if p.Current().Name == "true" || p.Current().Name == "false" {
 			return p.parseBoolean()
@@ -297,12 +358,29 @@ func (p *Parser) parsePostfix(left Node) Node {
 }
 
 func (p *Parser) parseExpression() Node {
-	return p.parsePostfix(p.parsePrimary())
+	return p.parseBinaryExpression()
+}
+
+func (p *Parser) parseBinaryExpression() Node {
+	left := p.parsePostfix(p.parsePrimary())
+
+	for !p.AtEnd() && p.Current().Type == lexer.STAR {
+		operator := p.Consume()
+		right := p.parsePostfix(p.parsePrimary())
+		left = NewToken(operator.Name, BINARY_EXPR, operator.Line, []Node{left, right})
+	}
+
+	return left
 }
 
 func (p *Parser) parseAssignment(name Node) Node {
 	assign := p.Consume()
 	value := p.parseExpression()
+
+	if assign.Name == "=>" {
+		return NewToken(assign.Name, FUNCTION_DECL, assign.Line, []Node{name, value})
+	}
+
 	children := []Node{name, value}
 
 	if !p.AtEnd() && p.Current().Type == lexer.ASSIGN {
@@ -319,13 +397,24 @@ func (p *Parser) parseAssignment(name Node) Node {
 }
 
 func (p *Parser) parseStatement() Node {
+	p.skipComments()
+
+	//handling comments
 	if p.Current().Type == lexer.COMMENT {
 		p.Consume()
 		return Node{Type: ILLEGAL}
 	}
 
+	if p.Current().Type == lexer.RETURN {
+		tok := p.Consume()
+		value := p.parseExpression()
+		return NewToken(tok.Name, RETURN_STATEMENT, tok.Line, []Node{value})
+	}
+
+	// a statement can both be a expression
 	node := p.parseExpression()
 
+	// or an assignment
 	if !p.AtEnd() && p.Current().Type == lexer.ASSIGN {
 		return p.parseAssignment(node)
 	}
@@ -337,6 +426,11 @@ func (p *Parser) Parse() {
 	p.Output = []Node{}
 
 	for !p.AtEnd() {
+		p.skipComments()
+		if p.AtEnd() {
+			break
+		}
+
 		start := p.Pos
 		node := p.parseStatement()
 		if node.Type != ILLEGAL {

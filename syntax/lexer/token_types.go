@@ -10,6 +10,8 @@ const (
 	FLOAT
 	STRING
 
+	RETURN
+	ASSERT
 	IDENTIFIER
 	ASSIGN
 
@@ -25,6 +27,7 @@ const (
 
 	COMMA
 	DOT
+	STAR
 )
 
 func (tt TokenType) String() string {
@@ -37,6 +40,10 @@ func (tt TokenType) String() string {
 		return "FLOAT"
 	case STRING:
 		return "STRING"
+	case RETURN:
+		return "RETURN"
+	case ASSERT:
+		return "ASSERT"
 	case IDENTIFIER:
 		return "IDENTIFIER"
 	case ASSIGN:
@@ -61,6 +68,8 @@ func (tt TokenType) String() string {
 		return "COMMA"
 	case DOT:
 		return "DOT"
+	case STAR:
+		return "STAR"
 	default:
 		return "ILLEGAL"
 	}

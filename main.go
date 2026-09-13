@@ -1,6 +1,8 @@
 package main
 
 import (
+	"blbx_lang/runtime/interpreter"
+	"blbx_lang/syntax/ir"
 	"blbx_lang/syntax/lexer"
 	"blbx_lang/syntax/parser"
 	"encoding/json"
@@ -30,7 +32,16 @@ func main() {
 	// run parser
 	p.Parse()
 
+	program := ir.Lower(p.Get())
+	runtime := interpreter.New()
+	result, err := runtime.Execute(program)
+	if err != nil {
+		panic(err)
+	}
+
 	writeJSON(filepath.Join("tests", "output", "first_test_output.json"), p.Get())
+	writeJSON(filepath.Join("tests", "output", "first_test_ir.json"), program)
+	writeJSON(filepath.Join("tests", "output", "first_test_runtime.json"), result)
 }
 
 func writeJSON(outputPath string, value interface{}) {
