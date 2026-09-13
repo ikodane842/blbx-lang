@@ -5,101 +5,69 @@
     "Line": 1,
     "Children": [
       {
-        "Name": "list",
+        "Name": "command",
         "Type": "IDENTIFIER",
         "Line": 1,
         "Children": []
       },
       {
-        "Name": "array",
-        "Type": "ARRAY_LITERAL",
+        "Name": "block",
+        "Type": "BLOCK",
         "Line": 1,
-        "Children": [
-          {
-            "Name": "stand",
-            "Type": "STRING_LITERAL",
-            "Line": 2,
-            "Children": []
-          },
-          {
-            "Name": "up",
-            "Type": "STRING_LITERAL",
-            "Line": 3,
-            "Children": []
-          },
-          {
-            "Name": "and",
-            "Type": "STRING_LITERAL",
-            "Line": 4,
-            "Children": []
-          },
-          {
-            "Name": "fight",
-            "Type": "STRING_LITERAL",
-            "Line": 5,
-            "Children": []
-          }
-        ]
+        "Children": []
       }
     ]
   },
   {
-    "Name": "for",
-    "Type": "FUNCTION_CALL",
-    "Line": 8,
+    "Name": "=",
+    "Type": "ASSIGNMENT",
+    "Line": 2,
     "Children": [
       {
-        "Name": "list",
-        "Type": "IDENTIFIER",
-        "Line": 9,
+        "Name": "hello",
+        "Type": "NAMESPACE",
+        "Line": 2,
+        "Children": [
+          {
+            "Name": "command",
+            "Type": "IDENTIFIER",
+            "Line": 2,
+            "Children": []
+          },
+          {
+            "Name": "hello",
+            "Type": "IDENTIFIER",
+            "Line": 2,
+            "Children": []
+          }
+        ]
+      },
+      {
+        "Name": "tuple",
+        "Type": "TUPLE_LITERAL",
+        "Line": 2,
         "Children": []
       },
       {
         "Name": "=>",
         "Type": "FUNCTION_DECL",
-        "Line": 10,
+        "Line": 2,
         "Children": [
-          {
-            "Name": "__",
-            "Type": "IDENTIFIER",
-            "Line": 10,
-            "Children": []
-          },
           {
             "Name": "block",
             "Type": "BLOCK",
-            "Line": 10,
+            "Line": 2,
             "Children": [
               {
                 "Name": "print",
                 "Type": "FUNCTION_CALL",
-                "Line": 11,
+                "Line": 3,
                 "Children": [
                   {
-                    "Name": "elem",
-                    "Type": "FUNCTION_CALL",
-                    "Line": 11,
-                    "Children": [
-                      {
-                        "Name": "elem",
-                        "Type": "NAMESPACE",
-                        "Line": 11,
-                        "Children": [
-                          {
-                            "Name": "__",
-                            "Type": "IDENTIFIER",
-                            "Line": 11,
-                            "Children": []
-                          },
-                          {
-                            "Name": "elem",
-                            "Type": "IDENTIFIER",
-                            "Line": 11,
-                            "Children": []
-                          }
-                        ]
-                      }
-                    ]
+                    "Name": "hello world\n",
+                    "Type": "STRING_LITERAL",
+                    "Line": 3,
+                    "Children": []
                   }
                 ]
               }
@@ -110,60 +78,160 @@
     ]
   },
   {
-    "Name": "for",
+    "Name": "if",
     "Type": "FUNCTION_CALL",
-    "Line": 15,
+    "Line": 14,
     "Children": [
       {
-        "Name": "list",
-        "Type": "IDENTIFIER",
-        "Line": 16,
-        "Children": []
+        "Name": "if",
+        "Type": "FUNCTION_CALL",
+        "Line": 15,
+        "Children": [
+          {
+            "Name": "true",
+            "Type": "BOOLEAN_LITERAL",
+            "Line": 16,
+            "Children": []
+          },
+          {
+            "Name": "=>",
+            "Type": "FUNCTION_DECL",
+            "Line": 17,
+            "Children": [
+              {
+                "Name": "tuple",
+                "Type": "TUPLE_LITERAL",
+                "Line": 17,
+                "Children": []
+              },
+              {
+                "Name": "block",
+                "Type": "BLOCK",
+                "Line": 17,
+                "Children": [
+                  {
+                    "Name": "return",
+                    "Type": "RETURN_STATEMENT",
+                    "Line": 18,
+                    "Children": [
+                      {
+                        "Name": "true",
+                        "Type": "BOOLEAN_LITERAL",
+                        "Line": 18,
+                        "Children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Name": "=>",
+            "Type": "FUNCTION_DECL",
+            "Line": 20,
+            "Children": [
+              {
+                "Name": "tuple",
+                "Type": "TUPLE_LITERAL",
+                "Line": 20,
+                "Children": []
+              },
+              {
+                "Name": "block",
+                "Type": "BLOCK",
+                "Line": 20,
+                "Children": [
+                  {
+                    "Name": "return",
+                    "Type": "RETURN_STATEMENT",
+                    "Line": 21,
+                    "Children": [
+                      {
+                        "Name": "false",
+                        "Type": "BOOLEAN_LITERAL",
+                        "Line": 21,
+                        "Children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "Name": "=>",
         "Type": "FUNCTION_DECL",
-        "Line": 17,
+        "Line": 25,
         "Children": [
           {
-            "Name": "__",
-            "Type": "IDENTIFIER",
-            "Line": 17,
+            "Name": "tuple",
+            "Type": "TUPLE_LITERAL",
+            "Line": 25,
             "Children": []
           },
           {
             "Name": "block",
             "Type": "BLOCK",
-            "Line": 17,
+            "Line": 25,
             "Children": [
               {
-                "Name": "print",
-                "Type": "FUNCTION_CALL",
-                "Line": 18,
+                "Name": "return",
+                "Type": "RETURN_STATEMENT",
+                "Line": 25,
                 "Children": [
                   {
-                    "Name": "index",
+                    "Name": "print",
                     "Type": "FUNCTION_CALL",
-                    "Line": 18,
+                    "Line": 25,
                     "Children": [
                       {
-                        "Name": "index",
-                        "Type": "NAMESPACE",
-                        "Line": 18,
-                        "Children": [
-                          {
-                            "Name": "__",
-                            "Type": "IDENTIFIER",
-                            "Line": 18,
-                            "Children": []
-                          },
-                          {
-                            "Name": "index",
-                            "Type": "IDENTIFIER",
-                            "Line": 18,
-                            "Children": []
-                          }
-                        ]
+                        "Name": "im happy",
+                        "Type": "STRING_LITERAL",
+                        "Line": 25,
+                        "Children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Name": "=>",
+        "Type": "FUNCTION_DECL",
+        "Line": 26,
+        "Children": [
+          {
+            "Name": "tuple",
+            "Type": "TUPLE_LITERAL",
+            "Line": 26,
+            "Children": []
+          },
+          {
+            "Name": "block",
+            "Type": "BLOCK",
+            "Line": 26,
+            "Children": [
+              {
+                "Name": "return",
+                "Type": "RETURN_STATEMENT",
+                "Line": 26,
+                "Children": [
+                  {
+                    "Name": "print",
+                    "Type": "FUNCTION_CALL",
+                    "Line": 26,
+                    "Children": [
+                      {
+                        "Name": "im sad",
+                        "Type": "STRING_LITERAL",
+                        "Line": 26,
+                        "Children": []
                       }
                     ]
                   }

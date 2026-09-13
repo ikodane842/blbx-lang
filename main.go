@@ -34,6 +34,8 @@ func main() {
 
 	program := ir.Lower(p.Get())
 	runtime := interpreter.New()
+	runtime.SetModuleRoot(filepath.Dir("tests/first_test.bx"))
+	runtime.SetCurrentFile("tests/first_test.bx")
 	result, err := runtime.Execute(program)
 	if err != nil {
 		panic(err)

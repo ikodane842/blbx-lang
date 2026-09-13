@@ -3,6 +3,7 @@ package parser
 import (
 	"blbx_lang/syntax/lexer"
 	"log"
+	"strings"
 )
 
 type Parser struct {
@@ -85,6 +86,49 @@ func (p *Parser) skipComments() {
 	}
 }
 
+func (p *Parser) startsExpression() bool {
+	if p.AtEnd() {
+		return false
+	}
+
+	switch p.Current().Type {
+	case lexer.ASSERT,
+		lexer.IDENTIFIER,
+		lexer.STRING,
+		lexer.INTEGER,
+		lexer.FLOAT,
+		lexer.OPEN_BRACKET,
+		lexer.OPEN_BRACE,
+		lexer.OPEN_PAREN:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *Parser) isFunctionLiteralStart() bool {
+	if p.AtEnd() || p.Current().Type != lexer.OPEN_PAREN {
+		return false
+	}
+
+	depth := 0
+	for offset := 0; p.Pos+offset < len(p.Input); offset++ {
+		tok := p.Peek(offset)
+		switch tok.Type {
+		case lexer.OPEN_PAREN:
+			depth++
+		case lexer.CLOSED_PAREN:
+			depth--
+			if depth == 0 {
+				next := p.Peek(offset + 1)
+				return next.Type == lexer.ASSIGN && next.Name == "=>"
+			}
+		}
+	}
+
+	return false
+}
+
 func (p *Parser) parseString() Node {
 	tok := p.Consume()
 
@@ -161,6 +205,10 @@ func (p *Parser) parseArguments() []Node {
 
 		p.skipComments()
 		if !p.match(lexer.COMMA) {
+			if p.startsExpression() {
+				continue
+			}
+
 			break
 		}
 	}
@@ -191,6 +239,81 @@ func (p *Parser) parseAssert() Node {
 		tok.Line,
 		p.parseArguments(),
 	)
+}
+
+func (p *Parser) parseImportPath() ([]Node, string) {
+	parts := []Node{}
+
+	if p.Current().Type != lexer.IDENTIFIER {
+		return parts, ""
+	}
+
+	for !p.AtEnd() {
+		tok := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		parts = append(parts, NewToken(tok.Name, IDENTIFIER, tok.Line, []Node{}))
+
+		if p.Current().Type != lexer.DOT {
+			break
+		}
+
+		p.Consume()
+	}
+
+	names := []string{}
+	for _, part := range parts {
+		names = append(names, part.Name)
+	}
+
+	return parts, strings.Join(names, ".")
+}
+
+func (p *Parser) parseImportStatement() Node {
+	tok := p.Consume()
+	pathParts, path := p.parseImportPath()
+	children := pathParts
+
+	if p.Current().Type == lexer.AS {
+		p.Consume()
+		alias := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		children = append(children, NewToken(alias.Name, IDENTIFIER, alias.Line, []Node{}))
+	}
+
+	return NewToken(path, IMPORT_STATEMENT, tok.Line, children)
+}
+
+func (p *Parser) parseFromImportStatement() Node {
+	tok := p.Consume()
+	_, path := p.parseImportPath()
+
+	if p.Current().Type != lexer.IMPORT {
+		return NewToken(path, FROM_IMPORT_STATEMENT, tok.Line, []Node{})
+	}
+
+	p.Consume()
+
+	imports := []Node{}
+	for !p.AtEnd() && p.Current().Type == lexer.IDENTIFIER {
+		name := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		children := []Node{}
+
+		if p.Current().Type == lexer.AS {
+			p.Consume()
+			alias := p.Current()
+			p.Expect(lexer.IDENTIFIER)
+			children = append(children, NewToken(alias.Name, IDENTIFIER, alias.Line, []Node{}))
+		}
+
+		imports = append(imports, NewToken(name.Name, IDENTIFIER, name.Line, children))
+
+		if !p.match(lexer.COMMA) {
+			break
+		}
+	}
+
+	return NewToken(path, FROM_IMPORT_STATEMENT, tok.Line, imports)
 }
 
 func (p *Parser) parseArrayLiteral() Node {
@@ -341,7 +464,11 @@ func (p *Parser) parsePostfix(left Node) Node {
 			continue
 		}
 
-		if p.match(lexer.OPEN_PAREN) {
+		if p.Current().Type == lexer.OPEN_PAREN {
+			if p.isFunctionLiteralStart() {
+				break
+			}
+			p.Consume()
 			left = Node{
 				Name:     left.Name,
 				Type:     FUNCTION_CALL,
@@ -409,6 +536,14 @@ func (p *Parser) parseStatement() Node {
 		tok := p.Consume()
 		value := p.parseExpression()
 		return NewToken(tok.Name, RETURN_STATEMENT, tok.Line, []Node{value})
+	}
+
+	if p.Current().Type == lexer.IMPORT {
+		return p.parseImportStatement()
+	}
+
+	if p.Current().Type == lexer.FROM {
+		return p.parseFromImportStatement()
 	}
 
 	// a statement can both be a expression

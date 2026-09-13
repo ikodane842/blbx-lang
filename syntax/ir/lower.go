@@ -1,6 +1,9 @@
 package ir
 
-import "blbx_lang/syntax/parser"
+import (
+	"blbx_lang/syntax/parser"
+	"strings"
+)
 
 func Lower(nodes []parser.Node) Node {
 	program := Node{
@@ -50,6 +53,10 @@ func lowerNode(node parser.Node) Node {
 		return lowerChildren(node, Return)
 	case parser.ASSERT_STATEMENT:
 		return lowerChildren(node, Assert)
+	case parser.IMPORT_STATEMENT:
+		return lowerImport(node)
+	case parser.FROM_IMPORT_STATEMENT:
+		return lowerFromImport(node)
 	case parser.ASSIGNMENT:
 		return lowerAssignment(node)
 	default:
@@ -119,6 +126,52 @@ func lowerCall(node parser.Node) Node {
 	call := lowerChildren(node, callType)
 	call.Name = node.Name
 	return call
+}
+
+func lowerImport(node parser.Node) Node {
+	importNode := Node{
+		Type:     Import,
+		Name:     node.Name,
+		DataType: "import",
+		Line:     node.Line,
+	}
+
+	pathLength := 0
+	if node.Name != "" {
+		pathLength = len(strings.Split(node.Name, "."))
+	}
+
+	if len(node.Children) > pathLength {
+		importNode.Value = node.Children[len(node.Children)-1].Name
+	}
+
+	return importNode
+}
+
+func lowerFromImport(node parser.Node) Node {
+	importNode := Node{
+		Type:     Import,
+		Name:     node.Name,
+		DataType: "from",
+		Line:     node.Line,
+		Children: []Node{},
+	}
+
+	for _, child := range node.Children {
+		imported := Node{
+			Type: Identifier,
+			Name: child.Name,
+			Line: child.Line,
+		}
+
+		if len(child.Children) > 0 {
+			imported.Value = child.Children[0].Name
+		}
+
+		importNode.Children = append(importNode.Children, imported)
+	}
+
+	return importNode
 }
 
 func lowerAssignment(node parser.Node) Node {

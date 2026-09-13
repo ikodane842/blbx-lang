@@ -17,6 +17,7 @@ const (
 	Function   Type = "FUNCTION"
 	Return     Type = "RETURN"
 	Assert     Type = "ASSERT"
+	Import     Type = "IMPORT"
 	If         Type = "IF"
 	For        Type = "FOR"
 	While      Type = "WHILE"

@@ -1,20 +1,27 @@
-list = [
-    "stand",
-    "up",
-    "and",
-    "fight"
-]
+command = {}
+command.hello = () => {
+    print("hello world\n")
+}
 
-for(
-    list,
-    (__) => {
-        print(__.elem())
-    }
-)
+//while(
+//    true,
+//    () => {
+//        cmd = input("[bx]:> ")
+//        run = command[cmd]()
+//    }
+//)
 
-for(
-    list,
-    (__) => {
-        print(__.index())
-    }
+if(
+    if(
+        true,
+        () => {
+            return true
+        },
+        () => {
+            return false
+        },
+    )
+
+    () => {return print("im happy")}
+    () => {return print("im sad")}
 )

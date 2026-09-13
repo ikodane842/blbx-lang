@@ -61,19 +61,42 @@ func (l *Lexer) readString(line int) {
 	// skip opening quote
 	l.Consume()
 
-	start := l.Pos
+	value := []rune{}
 
 	for !l.AtEnd() && l.Current() != '"' {
+		ch := l.Consume()
+		if ch != '\\' || l.AtEnd() {
+			value = append(value, ch)
+			continue
+		}
+
+		escaped := l.Consume()
+		switch escaped {
+		case 'n':
+			value = append(value, '\n')
+		case 'r':
+			value = append(value, '\r')
+		case 't':
+			value = append(value, '\t')
+		case 'b':
+			value = append(value, '\b')
+		case 'f':
+			value = append(value, '\f')
+		case '"':
+			value = append(value, '"')
+		case '\\':
+			value = append(value, '\\')
+		default:
+			value = append(value, escaped)
+		}
+	}
+
+	// skip closing quote
+	if !l.AtEnd() {
 		l.Consume()
 	}
 
-	// slice the runes between quotes
-	value := string(l.Input[start:l.Pos])
-
-	// skip closing quote
-	l.Consume()
-
-	l.AddToken(value, STRING, line)
+	l.AddToken(string(value), STRING, line)
 }
 
 func (l *Lexer) readNamespace(line int) {
@@ -92,6 +115,15 @@ func (l *Lexer) readNamespace(line int) {
 		return
 	case "assert":
 		l.AddToken(value, ASSERT, line)
+		return
+	case "import":
+		l.AddToken(value, IMPORT, line)
+		return
+	case "from":
+		l.AddToken(value, FROM, line)
+		return
+	case "as":
+		l.AddToken(value, AS, line)
 		return
 	}
 

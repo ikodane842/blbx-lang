@@ -3,98 +3,64 @@
   "children": [
     {
       "type": "ASSIGN",
-      "name": "list",
+      "name": "command",
       "line": 1,
       "children": [
         {
           "type": "IDENTIFIER",
-          "name": "list",
+          "name": "command",
           "line": 1
         },
         {
-          "type": "ARRAY",
-          "name": "array",
-          "line": 1,
-          "children": [
-            {
-              "type": "LITERAL",
-              "value": "stand",
-              "dataType": "string",
-              "line": 2
-            },
-            {
-              "type": "LITERAL",
-              "value": "up",
-              "dataType": "string",
-              "line": 3
-            },
-            {
-              "type": "LITERAL",
-              "value": "and",
-              "dataType": "string",
-              "line": 4
-            },
-            {
-              "type": "LITERAL",
-              "value": "fight",
-              "dataType": "string",
-              "line": 5
-            }
-          ]
+          "type": "BLOCK",
+          "line": 1
         }
       ]
     },
     {
-      "type": "FOR",
-      "name": "for",
-      "line": 8,
+      "type": "ASSIGN",
+      "line": 2,
       "children": [
         {
-          "type": "IDENTIFIER",
-          "name": "list",
-          "line": 9
-        },
-        {
-          "type": "FUNCTION",
-          "line": 10,
+          "type": "MEMBER",
+          "name": "hello",
+          "line": 2,
           "children": [
             {
               "type": "IDENTIFIER",
-              "name": "__",
-              "line": 10
+              "name": "command",
+              "line": 2
+            },
+            {
+              "type": "IDENTIFIER",
+              "name": "hello",
+              "line": 2
+            }
+          ]
+        },
+        {
+          "type": "FUNCTION",
+          "line": 2,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 2
             },
             {
               "type": "BLOCK",
-              "line": 10,
+              "line": 2,
               "children": [
                 {
                   "type": "CALL",
                   "name": "print",
-                  "line": 11,
+                  "line": 3,
                   "children": [
                     {
-                      "type": "CALL",
-                      "name": "elem",
-                      "line": 11,
-                      "children": [
-                        {
-                          "type": "MEMBER",
-                          "name": "elem",
-                          "line": 11,
-                          "children": [
-                            {
-                              "type": "IDENTIFIER",
-                              "name": "__",
-                              "line": 11
-                            },
-                            {
-                              "type": "IDENTIFIER",
-                              "name": "elem",
-                              "line": 11
-                            }
-                          ]
-                        }
-                      ]
+                      "type": "LITERAL",
+                      "value": "hello world\n",
+                      "dataType": "string",
+                      "line": 3
                     }
                   ]
                 }
@@ -105,54 +71,148 @@
       ]
     },
     {
-      "type": "FOR",
-      "name": "for",
-      "line": 15,
+      "type": "IF",
+      "name": "if",
+      "line": 14,
       "children": [
         {
-          "type": "IDENTIFIER",
-          "name": "list",
-          "line": 16
-        },
-        {
-          "type": "FUNCTION",
-          "line": 17,
+          "type": "IF",
+          "name": "if",
+          "line": 15,
           "children": [
             {
-              "type": "IDENTIFIER",
-              "name": "__",
-              "line": 17
+              "type": "LITERAL",
+              "value": "true",
+              "dataType": "boolean",
+              "line": 16
             },
             {
-              "type": "BLOCK",
+              "type": "FUNCTION",
               "line": 17,
               "children": [
                 {
-                  "type": "CALL",
-                  "name": "print",
-                  "line": 18,
+                  "type": "TUPLE",
+                  "name": "tuple",
+                  "line": 17
+                },
+                {
+                  "type": "BLOCK",
+                  "line": 17,
                   "children": [
                     {
-                      "type": "CALL",
-                      "name": "index",
+                      "type": "RETURN",
+                      "name": "return",
                       "line": 18,
                       "children": [
                         {
-                          "type": "MEMBER",
-                          "name": "index",
-                          "line": 18,
-                          "children": [
-                            {
-                              "type": "IDENTIFIER",
-                              "name": "__",
-                              "line": 18
-                            },
-                            {
-                              "type": "IDENTIFIER",
-                              "name": "index",
-                              "line": 18
-                            }
-                          ]
+                          "type": "LITERAL",
+                          "value": "true",
+                          "dataType": "boolean",
+                          "line": 18
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "FUNCTION",
+              "line": 20,
+              "children": [
+                {
+                  "type": "TUPLE",
+                  "name": "tuple",
+                  "line": 20
+                },
+                {
+                  "type": "BLOCK",
+                  "line": 20,
+                  "children": [
+                    {
+                      "type": "RETURN",
+                      "name": "return",
+                      "line": 21,
+                      "children": [
+                        {
+                          "type": "LITERAL",
+                          "value": "false",
+                          "dataType": "boolean",
+                          "line": 21
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "FUNCTION",
+          "line": 25,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 25
+            },
+            {
+              "type": "BLOCK",
+              "line": 25,
+              "children": [
+                {
+                  "type": "RETURN",
+                  "name": "return",
+                  "line": 25,
+                  "children": [
+                    {
+                      "type": "CALL",
+                      "name": "print",
+                      "line": 25,
+                      "children": [
+                        {
+                          "type": "LITERAL",
+                          "value": "im happy",
+                          "dataType": "string",
+                          "line": 25
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "FUNCTION",
+          "line": 26,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 26
+            },
+            {
+              "type": "BLOCK",
+              "line": 26,
+              "children": [
+                {
+                  "type": "RETURN",
+                  "name": "return",
+                  "line": 26,
+                  "children": [
+                    {
+                      "type": "CALL",
+                      "name": "print",
+                      "line": 26,
+                      "children": [
+                        {
+                          "type": "LITERAL",
+                          "value": "im sad",
+                          "dataType": "string",
+                          "line": 26
                         }
                       ]
                     }

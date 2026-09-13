@@ -12,6 +12,9 @@ const (
 
 	RETURN
 	ASSERT
+	IMPORT
+	FROM
+	AS
 	IDENTIFIER
 	ASSIGN
 
@@ -44,6 +47,12 @@ func (tt TokenType) String() string {
 		return "RETURN"
 	case ASSERT:
 		return "ASSERT"
+	case IMPORT:
+		return "IMPORT"
+	case FROM:
+		return "FROM"
+	case AS:
+		return "AS"
 	case IDENTIFIER:
 		return "IDENTIFIER"
 	case ASSIGN:

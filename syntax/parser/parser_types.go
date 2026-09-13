@@ -29,6 +29,8 @@ const (
 	ASSIGNMENT
 	RETURN_STATEMENT
 	ASSERT_STATEMENT
+	IMPORT_STATEMENT
+	FROM_IMPORT_STATEMENT
 
 	// blocks/scopes
 	BLOCK
@@ -73,6 +75,10 @@ func (pt ParserType) String() string {
 		return "RETURN_STATEMENT"
 	case ASSERT_STATEMENT:
 		return "ASSERT_STATEMENT"
+	case IMPORT_STATEMENT:
+		return "IMPORT_STATEMENT"
+	case FROM_IMPORT_STATEMENT:
+		return "FROM_IMPORT_STATEMENT"
 	case BLOCK:
 		return "BLOCK"
 	case FUNCTION_DECL:

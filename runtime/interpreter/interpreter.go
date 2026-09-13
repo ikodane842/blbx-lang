@@ -2,8 +2,15 @@ package interpreter
 
 import (
 	"blbx_lang/syntax/ir"
+	"blbx_lang/syntax/lexer"
+	"blbx_lang/syntax/parser"
+	"bufio"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type signal int
@@ -27,16 +34,96 @@ type Result struct {
 	Last    Value            `json:"last"`
 }
 
+type moduleState int
+
+const (
+	moduleLoading moduleState = iota
+	moduleLoaded
+)
+
+type moduleEntry struct {
+	state moduleState
+	value Value
+}
+
 type Interpreter struct {
-	global *Scope
-	Output []string
+	global      *Scope
+	Output      []string
+	Input       *bufio.Reader
+	moduleRoot  string
+	currentFile string
+	modules     map[string]*moduleEntry
 }
 
 func New() *Interpreter {
-	return &Interpreter{
-		global: NewScope(nil),
-		Output: []string{},
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = "."
 	}
+
+	return &Interpreter{
+		global:     NewScope(nil),
+		Output:     []string{},
+		Input:      bufio.NewReader(os.Stdin),
+		moduleRoot: wd,
+		modules:    map[string]*moduleEntry{},
+	}
+}
+
+func (i *Interpreter) SetInput(input io.Reader) {
+	if input == nil {
+		i.Input = bufio.NewReader(os.Stdin)
+		return
+	}
+
+	i.Input = bufio.NewReader(input)
+}
+
+func (i *Interpreter) SetModuleRoot(root string) {
+	if root == "" {
+		return
+	}
+
+	abs, err := filepath.Abs(root)
+	if err == nil {
+		root = abs
+	}
+
+	i.moduleRoot = root
+}
+
+func (i *Interpreter) SetCurrentFile(path string) {
+	if path == "" {
+		i.currentFile = ""
+		return
+	}
+
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+
+	i.currentFile = path
+}
+
+func (i *Interpreter) ExecuteFile(path string) (Result, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Result{}, err
+	}
+
+	i.SetModuleRoot(filepath.Dir(path))
+	i.SetCurrentFile(path)
+
+	var l lexer.Lexer
+	l.Set(string(data))
+	l.Tokenize()
+
+	var p parser.Parser
+	p.Set(l.Get())
+	p.Parse()
+
+	return i.Execute(ir.Lower(p.Get()))
 }
 
 func (i *Interpreter) Execute(program ir.Node) (Result, error) {
@@ -74,6 +161,8 @@ func (i *Interpreter) eval(node ir.Node, scope *Scope) (evalResult, error) {
 		return i.evalReturn(node, scope)
 	case ir.Assert:
 		return i.evalAssert(node, scope)
+	case ir.Import:
+		return i.evalImport(node, scope)
 	case ir.Call:
 		return i.evalCall(node, scope)
 	case ir.Member:
@@ -153,7 +242,7 @@ func (i *Interpreter) evalAssign(node ir.Node, scope *Scope) (evalResult, error)
 
 	target := node.Children[0]
 	valueNode := node.Children[len(node.Children)-1]
-	value, err := i.eval(valueNode, scope)
+	value, err := i.evalAssignmentValue(valueNode, scope)
 	if err != nil {
 		return value, err
 	}
@@ -173,6 +262,174 @@ func (i *Interpreter) evalAssign(node ir.Node, scope *Scope) (evalResult, error)
 	}
 
 	return normal(value.value)
+}
+
+func (i *Interpreter) evalAssignmentValue(node ir.Node, scope *Scope) (evalResult, error) {
+	if node.Type == ir.Block && len(node.Children) == 0 {
+		return normal(Object(map[string]Value{}))
+	}
+
+	return i.eval(node, scope)
+}
+
+func (i *Interpreter) evalImport(node ir.Node, scope *Scope) (evalResult, error) {
+	module, err := i.loadModule(node.Name)
+	if err != nil {
+		return evalResult{}, err
+	}
+
+	if node.DataType == "from" {
+		for _, imported := range node.Children {
+			value, ok := module.Object[imported.Name]
+			if !ok {
+				return evalResult{}, runtimeError(node, "module %q has no export %q", node.Name, imported.Name)
+			}
+
+			name := imported.Name
+			if imported.Value != "" {
+				name = imported.Value
+			}
+
+			scope.Set(name, value)
+		}
+
+		return normal(module)
+	}
+
+	if node.Value != "" {
+		scope.Set(node.Value, module)
+		return normal(module)
+	}
+
+	i.bindImportedModule(scope, strings.Split(node.Name, "."), module)
+	return normal(module)
+}
+
+func (i *Interpreter) bindImportedModule(scope *Scope, parts []string, module Value) {
+	if len(parts) == 0 {
+		return
+	}
+
+	if len(parts) == 1 {
+		scope.Set(parts[0], module)
+		return
+	}
+
+	rootName := parts[0]
+	root, ok := scope.Get(rootName)
+	if !ok || root.Kind != ObjectKind {
+		root = Object(map[string]Value{})
+	}
+
+	current := root
+	for _, part := range parts[1 : len(parts)-1] {
+		next, ok := current.Object[part]
+		if !ok || next.Kind != ObjectKind {
+			next = Object(map[string]Value{})
+			current.Object[part] = next
+		}
+		current = current.Object[part]
+	}
+
+	current.Object[parts[len(parts)-1]] = module
+	scope.Set(rootName, root)
+}
+
+func (i *Interpreter) loadModule(path string) (Value, error) {
+	modulePath, err := i.resolveModulePath(path)
+	if err != nil {
+		return Null(), err
+	}
+
+	entry, ok := i.modules[modulePath]
+	if ok {
+		return entry.value, nil
+	}
+
+	module := Object(map[string]Value{})
+	entry = &moduleEntry{state: moduleLoading, value: module}
+	i.modules[modulePath] = entry
+
+	data, err := os.ReadFile(modulePath)
+	if err != nil {
+		return Null(), err
+	}
+
+	var l lexer.Lexer
+	l.Set(string(data))
+	l.Tokenize()
+
+	var p parser.Parser
+	p.Set(l.Get())
+	p.Parse()
+
+	program := ir.Lower(p.Get())
+	moduleScope := NewScope(nil)
+
+	previousFile := i.currentFile
+	i.currentFile = modulePath
+	result, err := i.eval(program, moduleScope)
+	i.currentFile = previousFile
+	if err != nil {
+		return result.value, err
+	}
+
+	for name, value := range moduleScope.Snapshot() {
+		if strings.HasPrefix(name, "_") {
+			continue
+		}
+		module.Object[name] = value
+	}
+
+	entry.state = moduleLoaded
+	entry.value = module
+	return module, nil
+}
+
+func (i *Interpreter) resolveModulePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("[blbx][runtime] empty import path")
+	}
+
+	parts := strings.Split(path, ".")
+	for _, part := range parts {
+		if part == "" {
+			return "", fmt.Errorf("[blbx][runtime] invalid import path %q", path)
+		}
+	}
+
+	root := i.moduleRoot
+	if root == "" {
+		root = "."
+	}
+
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+
+	for index := 1; index < len(parts); index++ {
+		initParts := append([]string{}, parts[:index]...)
+		initParts = append(initParts, "__init__.bx")
+		initPath := filepath.Join(append([]string{root}, initParts...)...)
+		if _, err := os.Stat(initPath); err != nil {
+			return "", fmt.Errorf("[blbx][runtime] package %q requires %s", strings.Join(parts[:index], "."), initPath)
+		}
+	}
+
+	filePath := filepath.Join(append([]string{root}, parts...)...) + ".bx"
+	if _, err := os.Stat(filePath); err == nil {
+		return filepath.Abs(filePath)
+	}
+
+	initParts := append([]string{}, parts...)
+	initParts = append(initParts, "__init__.bx")
+	initPath := filepath.Join(append([]string{root}, initParts...)...)
+	if _, err := os.Stat(initPath); err == nil {
+		return filepath.Abs(initPath)
+	}
+
+	return "", fmt.Errorf("[blbx][runtime] could not resolve import %q from %s", path, root)
 }
 
 func (i *Interpreter) assignMember(target ir.Node, value Value, scope *Scope) error {
@@ -348,8 +605,16 @@ func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
 		return i.evalPrint(node, scope)
 	}
 
+	if node.Name == "input" {
+		return i.evalInput(node, scope)
+	}
+
 	if len(node.Children) > 0 && node.Children[0].Type == ir.Member {
 		return i.evalMethodCall(node, scope)
+	}
+
+	if len(node.Children) > 0 && node.Children[0].Type == ir.Index {
+		return i.evalExpressionCall(node, scope)
 	}
 
 	callee, ok := scope.Get(node.Name)
@@ -365,6 +630,27 @@ func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
 	return i.callFunction(callee.Function, args)
 }
 
+func (i *Interpreter) evalExpressionCall(node ir.Node, scope *Scope) (evalResult, error) {
+	callee, err := i.eval(node.Children[0], scope)
+	if err != nil {
+		return callee, err
+	}
+	if callee.signal != noSignal {
+		return callee, nil
+	}
+
+	if callee.value.Kind != FunctionKind {
+		return normal(Null())
+	}
+
+	args, result, err := i.evalArgs(node.Children[1:], scope)
+	if err != nil || result.signal != noSignal {
+		return result, err
+	}
+
+	return i.callFunction(callee.value.Function, args)
+}
+
 func (i *Interpreter) evalPrint(node ir.Node, scope *Scope) (evalResult, error) {
 	args, result, err := i.evalArgs(node.Children, scope)
 	if err != nil || result.signal != noSignal {
@@ -378,6 +664,27 @@ func (i *Interpreter) evalPrint(node ir.Node, scope *Scope) (evalResult, error) 
 	}
 
 	return normal(Null())
+}
+
+func (i *Interpreter) evalInput(node ir.Node, scope *Scope) (evalResult, error) {
+	args, result, err := i.evalArgs(node.Children, scope)
+	if err != nil || result.signal != noSignal {
+		return result, err
+	}
+
+	if len(args) > 0 {
+		fmt.Print(args[0].Display())
+	}
+
+	text, err := i.Input.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return evalResult{}, runtimeError(node, "input failed: %v", err)
+	}
+
+	text = strings.TrimSuffix(text, "\n")
+	text = strings.TrimSuffix(text, "\r")
+
+	return normal(String(text))
 }
 
 func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, error) {
@@ -406,6 +713,12 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 
 	if method == "break" {
 		return evalResult{value: Null(), signal: breakSignal}, nil
+	}
+
+	if receiver.value.Kind == ObjectKind {
+		if property, ok := receiver.value.Object[method]; ok && property.Kind == FunctionKind {
+			return i.callFunction(property.Function, args)
+		}
 	}
 
 	return normal(i.callMethod(receiver.value, method, args))
@@ -460,19 +773,56 @@ func (i *Interpreter) callMethod(receiver Value, method string, args []Value) Va
 		if receiver.Kind == StringKind && len(args) > 0 {
 			return String(receiver.String + args[0].Display())
 		}
+	case "add":
+		if len(args) > 0 {
+			return numericOperation(receiver, args[0], "+")
+		}
+	case "sub":
+		if len(args) > 0 {
+			return numericOperation(receiver, args[0], "-")
+		}
+	case "mul":
+		if len(args) > 0 {
+			return numericOperation(receiver, args[0], "*")
+		}
+	case "div":
+		if len(args) > 0 {
+			return numericOperation(receiver, args[0], "/")
+		}
+	case "mod":
+		if len(args) > 0 {
+			return numericOperation(receiver, args[0], "%")
+		}
+	case "gt":
+		if len(args) > 0 {
+			return Boolean(compareValues(receiver, args[0], ">"))
+		}
+	case "gte":
+		if len(args) > 0 {
+			return Boolean(compareValues(receiver, args[0], ">="))
+		}
+	case "lt":
+		if len(args) > 0 {
+			return Boolean(compareValues(receiver, args[0], "<"))
+		}
+	case "lte":
+		if len(args) > 0 {
+			return Boolean(compareValues(receiver, args[0], "<="))
+		}
 	case "eq":
 		if len(args) > 0 {
 			return Boolean(receiver.Equal(args[0]))
 		}
+	case "neq":
+		if len(args) > 0 {
+			return Boolean(!receiver.Equal(args[0]))
+		}
+	case "not":
+		return Boolean(!receiver.IsTruthy())
 	case "type":
 		return String(receiver.TypeName())
 	case "length":
-		switch receiver.Kind {
-		case ArrayKind:
-			return Integer(int64(len(receiver.Array)))
-		case StringKind:
-			return Integer(int64(len(receiver.String)))
-		}
+		return lengthOf(receiver)
 	case "elem":
 		if receiver.Kind == ObjectKind {
 			if value, ok := receiver.Object["elem"]; ok {
@@ -514,6 +864,10 @@ func (i *Interpreter) evalMember(node ir.Node, scope *Scope) (evalResult, error)
 	}
 
 	property := node.Children[1].Name
+	if property == "length" {
+		return normal(lengthOf(receiver.value))
+	}
+
 	if receiver.value.Kind == ObjectKind {
 		if value, ok := receiver.value.Object[property]; ok {
 			return normal(value)
@@ -537,16 +891,24 @@ func (i *Interpreter) evalIndex(node ir.Node, scope *Scope) (evalResult, error) 
 		return index, err
 	}
 
-	if target.value.Kind != ArrayKind || index.value.Kind != IntegerKind {
+	if target.value.Kind == ObjectKind && index.value.Kind == StringKind {
+		if value, ok := target.value.Object[index.value.String]; ok {
+			return normal(value)
+		}
+
 		return normal(Null())
 	}
 
-	arrayIndex := int(index.value.Integer)
-	if arrayIndex < 0 || arrayIndex >= len(target.value.Array) {
-		return normal(Null())
+	if target.value.Kind == ArrayKind && index.value.Kind == IntegerKind {
+		arrayIndex := int(index.value.Integer)
+		if arrayIndex < 0 || arrayIndex >= len(target.value.Array) {
+			return normal(Null())
+		}
+
+		return normal(target.value.Array[arrayIndex])
 	}
 
-	return normal(target.value.Array[arrayIndex])
+	return normal(Null())
 }
 
 func (i *Interpreter) evalBinary(node ir.Node, scope *Scope) (evalResult, error) {
@@ -702,4 +1064,87 @@ func (i *Interpreter) evalScopedValue(node ir.Node, scope *Scope) (evalResult, e
 
 func runtimeError(node ir.Node, format string, args ...interface{}) error {
 	return fmt.Errorf("[blbx][runtime] line %d: %s", node.Line, fmt.Sprintf(format, args...))
+}
+
+func lengthOf(value Value) Value {
+	switch value.Kind {
+	case ArrayKind:
+		return Integer(int64(len(value.Array)))
+	case StringKind:
+		return Integer(int64(len(value.String)))
+	default:
+		return Null()
+	}
+}
+
+func numericOperation(left Value, right Value, operator string) Value {
+	if !isNumeric(left) || !isNumeric(right) {
+		return Null()
+	}
+
+	if operator == "/" {
+		if right.number() == 0 {
+			return Null()
+		}
+		return Float(left.number() / right.number())
+	}
+
+	if operator == "%" {
+		if left.Kind != IntegerKind || right.Kind != IntegerKind || right.Integer == 0 {
+			return Null()
+		}
+		return Integer(left.Integer % right.Integer)
+	}
+
+	if left.Kind == IntegerKind && right.Kind == IntegerKind {
+		switch operator {
+		case "+":
+			return Integer(left.Integer + right.Integer)
+		case "-":
+			return Integer(left.Integer - right.Integer)
+		case "*":
+			return Integer(left.Integer * right.Integer)
+		}
+	}
+
+	switch operator {
+	case "+":
+		return Float(left.number() + right.number())
+	case "-":
+		return Float(left.number() - right.number())
+	case "*":
+		return Float(left.number() * right.number())
+	default:
+		return Null()
+	}
+}
+
+func compareValues(left Value, right Value, operator string) bool {
+	if isNumeric(left) && isNumeric(right) {
+		switch operator {
+		case ">":
+			return left.number() > right.number()
+		case ">=":
+			return left.number() >= right.number()
+		case "<":
+			return left.number() < right.number()
+		case "<=":
+			return left.number() <= right.number()
+		}
+	}
+
+	if left.Kind == StringKind && right.Kind == StringKind {
+		switch operator {
+		case ">":
+			return left.String > right.String
+		case ">=":
+			return left.String >= right.String
+		case "<":
+			return left.String < right.String
+		case "<=":
+			return left.String <= right.String
+		}
+	}
+
+	return false
 }
