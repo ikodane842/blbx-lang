@@ -1,0 +1,6 @@
+class Token {
+    (kind, text) => {
+        self.kind = kind
+        self.text = text
+    }
+}

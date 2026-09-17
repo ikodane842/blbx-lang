@@ -6,6 +6,10 @@ type ParserType int
 
 const (
 	ILLEGAL ParserType = iota
+	ARRAY_PATTERN
+	OBJECT_PATTERN
+	PATTERN_FIELD
+	REST_PATTERN
 
 	// literals
 	INTEGER_LITERAL
@@ -45,6 +49,14 @@ const (
 
 func (pt ParserType) String() string {
 	switch pt {
+	case ARRAY_PATTERN:
+		return "ARRAY_PATTERN"
+	case OBJECT_PATTERN:
+		return "OBJECT_PATTERN"
+	case PATTERN_FIELD:
+		return "PATTERN_FIELD"
+	case REST_PATTERN:
+		return "REST_PATTERN"
 	case INTEGER_LITERAL:
 		return "INTEGER_LITERAL"
 	case FLOAT_LITERAL:

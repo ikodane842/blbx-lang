@@ -1,0 +1,2 @@
+// Required marker for importing cli.app.
+prompt = "blbx-cli> "

@@ -30,7 +30,6 @@ from std.io import word
 
 print(io.echo("hello from import"))
 print(word)
-print(io._hidden)
 `)
 
 	runtime := New()
@@ -39,9 +38,13 @@ print(io._hidden)
 		t.Fatalf("execute failed: %v", err)
 	}
 
-	want := []string{"hello from import", "module-word", "null"}
+	want := []string{"hello from import", "module-word"}
 	if !sameStrings(result.Output, want) {
 		t.Fatalf("output = %#v, want %#v", result.Output, want)
+	}
+	writeTestFile(t, filepath.Join(root, "hidden.bx"), `import std.io as io print(io._hidden)`)
+	if result, err := New().ExecuteFile(filepath.Join(root, "hidden.bx")); err != nil || !sameStrings(result.Output, []string{"secret"}) {
+		t.Fatalf("all module names should be importable: %v, %v", result.Output, err)
 	}
 }
 

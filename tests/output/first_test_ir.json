@@ -3,64 +3,279 @@
   "children": [
     {
       "type": "ASSIGN",
-      "name": "command",
+      "name": "add",
       "line": 1,
       "children": [
         {
           "type": "IDENTIFIER",
-          "name": "command",
+          "name": "add",
           "line": 1
         },
         {
-          "type": "BLOCK",
-          "line": 1
+          "type": "FUNCTION",
+          "name": "add",
+          "line": 1,
+          "children": [
+            {
+              "type": "TUPLE",
+              "name": "tuple",
+              "line": 1,
+              "children": [
+                {
+                  "type": "IDENTIFIER",
+                  "name": "a",
+                  "line": 1
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "b",
+                  "line": 1
+                }
+              ]
+            },
+            {
+              "type": "BLOCK",
+              "line": 1,
+              "children": [
+                {
+                  "type": "RETURN",
+                  "name": "return",
+                  "line": 2,
+                  "children": [
+                    {
+                      "type": "CALL",
+                      "name": "add",
+                      "line": 2,
+                      "children": [
+                        {
+                          "type": "MEMBER",
+                          "name": "add",
+                          "line": 2,
+                          "children": [
+                            {
+                              "type": "IDENTIFIER",
+                              "name": "a",
+                              "line": 2
+                            },
+                            {
+                              "type": "IDENTIFIER",
+                              "name": "add",
+                              "line": 2
+                            }
+                          ]
+                        },
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "b",
+                          "line": 2
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "CALL",
+      "name": "print",
+      "line": 5,
+      "children": [
+        {
+          "type": "CALL",
+          "name": "add",
+          "line": 5,
+          "children": [
+            {
+              "type": "LITERAL",
+              "value": "2",
+              "dataType": "integer",
+              "line": 5
+            },
+            {
+              "type": "LITERAL",
+              "value": "5",
+              "dataType": "integer",
+              "line": 5
+            }
+          ]
         }
       ]
     },
     {
       "type": "ASSIGN",
-      "line": 2,
+      "name": "classA",
+      "line": 7,
+      "children": [
+        {
+          "type": "IDENTIFIER",
+          "name": "classA",
+          "line": 7
+        },
+        {
+          "type": "BLOCK",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "line": 8,
       "children": [
         {
           "type": "MEMBER",
-          "name": "hello",
-          "line": 2,
+          "name": "name",
+          "line": 8,
           "children": [
             {
               "type": "IDENTIFIER",
-              "name": "command",
-              "line": 2
+              "name": "classA",
+              "line": 8
             },
             {
               "type": "IDENTIFIER",
-              "name": "hello",
-              "line": 2
+              "name": "name",
+              "line": 8
+            }
+          ]
+        },
+        {
+          "type": "LITERAL",
+          "dataType": "string",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "line": 9,
+      "children": [
+        {
+          "type": "MEMBER",
+          "name": "value",
+          "line": 9,
+          "children": [
+            {
+              "type": "IDENTIFIER",
+              "name": "classA",
+              "line": 9
+            },
+            {
+              "type": "IDENTIFIER",
+              "name": "value",
+              "line": 9
+            }
+          ]
+        },
+        {
+          "type": "LITERAL",
+          "dataType": "string",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "type": "ASSIGN",
+      "line": 10,
+      "children": [
+        {
+          "type": "MEMBER",
+          "name": "init",
+          "line": 10,
+          "children": [
+            {
+              "type": "IDENTIFIER",
+              "name": "classA",
+              "line": 10
+            },
+            {
+              "type": "IDENTIFIER",
+              "name": "init",
+              "line": 10
             }
           ]
         },
         {
           "type": "FUNCTION",
-          "line": 2,
+          "line": 10,
           "children": [
             {
               "type": "TUPLE",
               "name": "tuple",
-              "line": 2
+              "line": 10,
+              "children": [
+                {
+                  "type": "IDENTIFIER",
+                  "name": "_name",
+                  "line": 10
+                },
+                {
+                  "type": "IDENTIFIER",
+                  "name": "_value",
+                  "line": 10
+                }
+              ]
             },
             {
               "type": "BLOCK",
-              "line": 2,
+              "line": 10,
               "children": [
                 {
-                  "type": "CALL",
-                  "name": "print",
-                  "line": 3,
+                  "type": "ASSIGN",
+                  "line": 11,
                   "children": [
                     {
-                      "type": "LITERAL",
-                      "value": "hello world\n",
-                      "dataType": "string",
-                      "line": 3
+                      "type": "MEMBER",
+                      "name": "name",
+                      "line": 11,
+                      "children": [
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "classA",
+                          "line": 11
+                        },
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "name",
+                          "line": 11
+                        }
+                      ]
+                    },
+                    {
+                      "type": "IDENTIFIER",
+                      "name": "_name",
+                      "line": 11
+                    }
+                  ]
+                },
+                {
+                  "type": "ASSIGN",
+                  "line": 12,
+                  "children": [
+                    {
+                      "type": "MEMBER",
+                      "name": "value",
+                      "line": 12,
+                      "children": [
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "classA",
+                          "line": 12
+                        },
+                        {
+                          "type": "IDENTIFIER",
+                          "name": "value",
+                          "line": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "IDENTIFIER",
+                      "name": "_value",
+                      "line": 12
                     }
                   ]
                 }
@@ -71,154 +286,84 @@
       ]
     },
     {
-      "type": "IF",
-      "name": "if",
-      "line": 14,
+      "type": "CALL",
+      "name": "init",
+      "line": 15,
       "children": [
         {
-          "type": "IF",
-          "name": "if",
+          "type": "MEMBER",
+          "name": "init",
           "line": 15,
           "children": [
             {
-              "type": "LITERAL",
-              "value": "true",
-              "dataType": "boolean",
-              "line": 16
+              "type": "IDENTIFIER",
+              "name": "classA",
+              "line": 15
             },
             {
-              "type": "FUNCTION",
-              "line": 17,
-              "children": [
-                {
-                  "type": "TUPLE",
-                  "name": "tuple",
-                  "line": 17
-                },
-                {
-                  "type": "BLOCK",
-                  "line": 17,
-                  "children": [
-                    {
-                      "type": "RETURN",
-                      "name": "return",
-                      "line": 18,
-                      "children": [
-                        {
-                          "type": "LITERAL",
-                          "value": "true",
-                          "dataType": "boolean",
-                          "line": 18
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "FUNCTION",
-              "line": 20,
-              "children": [
-                {
-                  "type": "TUPLE",
-                  "name": "tuple",
-                  "line": 20
-                },
-                {
-                  "type": "BLOCK",
-                  "line": 20,
-                  "children": [
-                    {
-                      "type": "RETURN",
-                      "name": "return",
-                      "line": 21,
-                      "children": [
-                        {
-                          "type": "LITERAL",
-                          "value": "false",
-                          "dataType": "boolean",
-                          "line": 21
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
+              "type": "IDENTIFIER",
+              "name": "init",
+              "line": 15
             }
           ]
         },
         {
-          "type": "FUNCTION",
-          "line": 25,
-          "children": [
-            {
-              "type": "TUPLE",
-              "name": "tuple",
-              "line": 25
-            },
-            {
-              "type": "BLOCK",
-              "line": 25,
-              "children": [
-                {
-                  "type": "RETURN",
-                  "name": "return",
-                  "line": 25,
-                  "children": [
-                    {
-                      "type": "CALL",
-                      "name": "print",
-                      "line": 25,
-                      "children": [
-                        {
-                          "type": "LITERAL",
-                          "value": "im happy",
-                          "dataType": "string",
-                          "line": 25
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
+          "type": "LITERAL",
+          "value": "one",
+          "dataType": "string",
+          "line": 15
         },
         {
-          "type": "FUNCTION",
-          "line": 26,
+          "type": "LITERAL",
+          "value": "two",
+          "dataType": "string",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "type": "CALL",
+      "name": "print",
+      "line": 17,
+      "children": [
+        {
+          "type": "MEMBER",
+          "name": "name",
+          "line": 17,
           "children": [
             {
-              "type": "TUPLE",
-              "name": "tuple",
-              "line": 26
+              "type": "IDENTIFIER",
+              "name": "classA",
+              "line": 17
             },
             {
-              "type": "BLOCK",
-              "line": 26,
-              "children": [
-                {
-                  "type": "RETURN",
-                  "name": "return",
-                  "line": 26,
-                  "children": [
-                    {
-                      "type": "CALL",
-                      "name": "print",
-                      "line": 26,
-                      "children": [
-                        {
-                          "type": "LITERAL",
-                          "value": "im sad",
-                          "dataType": "string",
-                          "line": 26
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
+              "type": "IDENTIFIER",
+              "name": "name",
+              "line": 17
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "CALL",
+      "name": "print",
+      "line": 18,
+      "children": [
+        {
+          "type": "MEMBER",
+          "name": "value",
+          "line": 18,
+          "children": [
+            {
+              "type": "IDENTIFIER",
+              "name": "classA",
+              "line": 18
+            },
+            {
+              "type": "IDENTIFIER",
+              "name": "value",
+              "line": 18
             }
           ]
         }

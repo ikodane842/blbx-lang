@@ -1,9 +1,12 @@
 package lexer
 
 type LexerToken struct {
-	Name string
-	Type TokenType
-	Line int
+	Name      string
+	Type      TokenType
+	Line      int
+	Column    int
+	EndLine   int
+	EndColumn int
 }
 
 func NewToken(_name string, _type TokenType, _line int) LexerToken {

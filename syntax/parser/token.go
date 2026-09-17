@@ -1,10 +1,12 @@
 package parser
 
 type Node struct {
-	Name     string
-	Type     ParserType
-	Line     int
-	Children []Node
+	Base       *Node `json:"base,omitempty"`
+	DirectCall bool  `json:"directCall,omitempty"`
+	Name       string
+	Type       ParserType
+	Line       int
+	Children   []Node
 }
 
 func NewToken(_name string, _type ParserType, _line int, _children []Node) Node {

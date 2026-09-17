@@ -1,15 +1,19 @@
 package parser
 
 import (
+	"blbx_lang/syntax/diagnostic"
 	"blbx_lang/syntax/lexer"
-	"log"
+	"fmt"
 	"strings"
 )
 
 type Parser struct {
-	Input  []lexer.LexerToken
-	Output []Node
-	Pos    int
+	Input       []lexer.LexerToken
+	Output      []Node
+	Pos         int
+	Diagnostics []diagnostic.Diagnostic
+	eof         lexer.LexerToken
+	depth       int
 }
 
 func (p *Parser) Consume() lexer.LexerToken {
@@ -24,7 +28,7 @@ func (p *Parser) AtEnd() bool {
 
 func (p *Parser) Current() lexer.LexerToken {
 	if p.AtEnd() {
-		return lexer.LexerToken{}
+		return p.eof
 	}
 
 	return p.Input[p.Pos]
@@ -43,32 +47,55 @@ func (p *Parser) Get() []Node {
 }
 
 func (p *Parser) Set(tokens []lexer.LexerToken) {
-	p.Input = tokens
-	p.Pos = 0
-	p.Output = []Node{}
+	*p = Parser{Output: []Node{}, eof: lexer.LexerToken{Type: lexer.EOF, Line: 1, Column: 1, EndLine: 1, EndColumn: 1}}
+	for _, tok := range tokens {
+		if tok.Type == lexer.EOF {
+			p.eof = tok
+			continue
+		}
+		// Comments are trivia everywhere, including between an operator and value.
+		if tok.Type != lexer.COMMENT {
+			p.Input = append(p.Input, tok)
+		}
+		p.eof.Line, p.eof.Column = tok.EndLine, tok.EndColumn
+		p.eof.EndLine, p.eof.EndColumn = tok.EndLine, tok.EndColumn
+	}
 }
 
 func (p *Parser) Expect(tt lexer.TokenType) {
-	if p.AtEnd() {
-		log.Fatalf(
-			"syntax error: expected %v, got EOF",
-			tt,
-		)
-	}
-
-	if p.Current().Type != tt {
-		tok := p.Current()
-
-		log.Fatalf(
-			"[blbx][syntax]: error at line %d; expected %v, got %v (%q)",
-			tok.Line,
-			tt,
-			tok.Type,
-			tok.Name,
-		)
+	if p.AtEnd() || p.Current().Type != tt {
+		p.fail("BX2001", fmt.Sprintf("expected %v, got %s", tt, p.describe()))
 	}
 
 	p.Consume()
+}
+
+// syntaxFailure is recovered only at a statement boundary. Unexpected panics
+// are deliberately not hidden as user syntax errors.
+type syntaxFailure struct{}
+
+func (p *Parser) describe() string {
+	if p.AtEnd() {
+		return "end of file"
+	}
+	return fmt.Sprintf("%q", p.Current().Name)
+}
+
+func (p *Parser) fail(code, message string) {
+	t := p.Current()
+	p.Diagnostics = append(p.Diagnostics, diagnostic.Diagnostic{
+		Line: t.Line, Column: t.Column, EndLine: t.EndLine, EndColumn: t.EndColumn,
+		Severity: "error", Code: code, Message: message,
+	})
+	panic(syntaxFailure{})
+}
+
+func (p *Parser) enter() func() {
+	if p.depth >= 256 {
+		p.fail("BX2004", "syntax nesting exceeds limit of 256")
+	}
+	p.depth++
+	return func() { p.depth-- }
 }
 
 func (p *Parser) match(tt lexer.TokenType) bool {
@@ -93,6 +120,7 @@ func (p *Parser) startsExpression() bool {
 
 	switch p.Current().Type {
 	case lexer.ASSERT,
+		lexer.SELF,
 		lexer.IDENTIFIER,
 		lexer.STRING,
 		lexer.INTEGER,
@@ -107,20 +135,27 @@ func (p *Parser) startsExpression() bool {
 }
 
 func (p *Parser) isFunctionLiteralStart() bool {
-	if p.AtEnd() || p.Current().Type != lexer.OPEN_PAREN {
+	return p.isFunctionLiteralAt(p.Pos)
+}
+
+func (p *Parser) isFunctionLiteralAt(start int) bool {
+	if start >= len(p.Input) || p.Input[start].Type != lexer.OPEN_PAREN {
 		return false
 	}
 
 	depth := 0
-	for offset := 0; p.Pos+offset < len(p.Input); offset++ {
-		tok := p.Peek(offset)
+	for index := start; index < len(p.Input); index++ {
+		tok := p.Input[index]
 		switch tok.Type {
 		case lexer.OPEN_PAREN:
 			depth++
 		case lexer.CLOSED_PAREN:
 			depth--
 			if depth == 0 {
-				next := p.Peek(offset + 1)
+				if index+1 >= len(p.Input) {
+					return false
+				}
+				next := p.Input[index+1]
 				return next.Type == lexer.ASSIGN && next.Name == "=>"
 			}
 		}
@@ -222,10 +257,11 @@ func (p *Parser) parseFunctionCall() Node {
 	p.Expect(lexer.OPEN_PAREN)
 
 	return Node{
-		Name:     tok.Name,
-		Type:     FUNCTION_CALL,
-		Line:     tok.Line,
-		Children: p.parseArguments(),
+		DirectCall: true,
+		Name:       tok.Name,
+		Type:       FUNCTION_CALL,
+		Line:       tok.Line,
+		Children:   p.parseArguments(),
 	}
 }
 
@@ -245,7 +281,7 @@ func (p *Parser) parseImportPath() ([]Node, string) {
 	parts := []Node{}
 
 	if p.Current().Type != lexer.IDENTIFIER {
-		return parts, ""
+		p.fail("BX2001", "expected module path")
 	}
 
 	for !p.AtEnd() {
@@ -258,6 +294,9 @@ func (p *Parser) parseImportPath() ([]Node, string) {
 		}
 
 		p.Consume()
+		if p.AtEnd() {
+			p.fail("BX2001", "expected module name after '.'")
+		}
 	}
 
 	names := []string{}
@@ -287,11 +326,10 @@ func (p *Parser) parseFromImportStatement() Node {
 	tok := p.Consume()
 	_, path := p.parseImportPath()
 
-	if p.Current().Type != lexer.IMPORT {
-		return NewToken(path, FROM_IMPORT_STATEMENT, tok.Line, []Node{})
+	p.Expect(lexer.IMPORT)
+	if p.Current().Type != lexer.IDENTIFIER {
+		p.fail("BX2001", "expected imported name")
 	}
-
-	p.Consume()
 
 	imports := []Node{}
 	for !p.AtEnd() && p.Current().Type == lexer.IDENTIFIER {
@@ -310,6 +348,9 @@ func (p *Parser) parseFromImportStatement() Node {
 
 		if !p.match(lexer.COMMA) {
 			break
+		}
+		if p.Current().Type != lexer.IDENTIFIER {
+			p.fail("BX2001", "expected imported name after ','")
 		}
 	}
 
@@ -361,6 +402,9 @@ func (p *Parser) parseBlock() Node {
 		if stmt.Type != ILLEGAL {
 			body = append(body, stmt)
 		}
+		if stmt.Type == ASSIGNMENT && len(stmt.Children) > 0 && stmt.Children[0].Type == STRING_LITERAL {
+			p.match(lexer.COMMA)
+		}
 
 		if p.Pos == start {
 			p.Consume()
@@ -408,10 +452,12 @@ func (p *Parser) parseParenExpression() Node {
 
 func (p *Parser) parsePrimary() Node {
 	if p.AtEnd() {
-		return Node{Type: ILLEGAL}
+		p.fail("BX2002", "expected expression, got end of file")
 	}
 
 	switch p.Current().Type {
+	case lexer.SELF:
+		return p.parseIdentifier()
 	case lexer.ASSERT:
 		return p.parseAssert()
 	case lexer.IDENTIFIER:
@@ -419,7 +465,7 @@ func (p *Parser) parsePrimary() Node {
 			return p.parseBoolean()
 		}
 
-		if p.Peek(1).Type == lexer.OPEN_PAREN {
+		if p.Peek(1).Type == lexer.OPEN_PAREN && !p.isFunctionLiteralAt(p.Pos+1) {
 			return p.parseFunctionCall()
 		}
 
@@ -435,18 +481,36 @@ func (p *Parser) parsePrimary() Node {
 	case lexer.OPEN_BRACE:
 		return p.parseBlock()
 	case lexer.OPEN_PAREN:
+		if p.isFunctionLiteralStart() {
+			params := p.parseParenExpression()
+			validateParams := []Node{params}
+			if params.Type == TUPLE_LITERAL {
+				validateParams = params.Children
+			}
+			for _, param := range validateParams {
+				if param.Type == IDENTIFIER && param.Name == "self" {
+					p.fail("BX2003", "self cannot be used as a parameter")
+				}
+			}
+			arrow := p.Consume()
+			body := p.parseExpression()
+			return NewToken(arrow.Name, FUNCTION_DECL, arrow.Line, []Node{params, body})
+		}
 		return p.parseParenExpression()
 	case lexer.COMMENT:
 		p.Consume()
 		return Node{Type: ILLEGAL}
 	default:
-		p.Consume()
+		p.fail("BX2002", fmt.Sprintf("expected expression, got %s", p.describe()))
 		return Node{Type: ILLEGAL}
 	}
 }
 
 func (p *Parser) parsePostfix(left Node) Node {
 	for !p.AtEnd() {
+		if p.Pos > 0 && p.Current().Line > p.Input[p.Pos-1].EndLine && p.startsDestructuring() {
+			break
+		}
 		if p.match(lexer.OPEN_BRACKET) {
 			index := p.parseExpression()
 			p.Expect(lexer.CLOSED_BRACKET)
@@ -485,6 +549,7 @@ func (p *Parser) parsePostfix(left Node) Node {
 }
 
 func (p *Parser) parseExpression() Node {
+	defer p.enter()()
 	return p.parseBinaryExpression()
 }
 
@@ -501,6 +566,13 @@ func (p *Parser) parseBinaryExpression() Node {
 }
 
 func (p *Parser) parseAssignment(name Node) Node {
+	defer p.enter()()
+	if name.Type == IDENTIFIER && name.Name == "self" {
+		p.fail("BX2003", "self cannot be reassigned or used as a parameter")
+	}
+	if p.Current().Name != "=>" && name.Type != IDENTIFIER && name.Type != NAMESPACE && name.Type != INDEX && !(name.Type == STRING_LITERAL && p.Current().Name == ":") {
+		p.fail("BX2003", "assignment target must be a name, member, or index")
+	}
 	assign := p.Consume()
 	value := p.parseExpression()
 
@@ -525,6 +597,16 @@ func (p *Parser) parseAssignment(name Node) Node {
 
 func (p *Parser) parseStatement() Node {
 	p.skipComments()
+	if p.startsDestructuring() {
+		target := p.parsePattern(map[string]bool{})
+		assign := p.Current()
+		p.Expect(lexer.ASSIGN)
+		value := p.parseExpression()
+		return NewToken(assign.Name, ASSIGNMENT, assign.Line, []Node{target, value})
+	}
+	if p.Current().Type == lexer.CLASS {
+		return p.parseClass()
+	}
 
 	//handling comments
 	if p.Current().Type == lexer.COMMENT {
@@ -557,8 +639,46 @@ func (p *Parser) parseStatement() Node {
 	return node
 }
 
+func (p *Parser) parseClass() Node {
+	defer p.enter()()
+	tok := p.Consume()
+	name := p.Current()
+	p.Expect(lexer.IDENTIFIER)
+	var base *Node
+	if p.match(lexer.EXTENDS) {
+		parent := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		value := NewToken(parent.Name, IDENTIFIER, parent.Line, nil)
+		for p.match(lexer.DOT) {
+			member := p.Current()
+			p.Expect(lexer.IDENTIFIER)
+			value = NewToken(member.Name, NAMESPACE, member.Line, []Node{value, NewToken(member.Name, IDENTIFIER, member.Line, nil)})
+		}
+		base = &value
+	}
+	if p.Current().Type != lexer.OPEN_BRACE {
+		p.fail("BX2001", "expected class body '{'")
+	}
+	body := p.parseBlock()
+	constructors := 0
+	for _, member := range body.Children {
+		if member.Type == FUNCTION_DECL {
+			constructors++
+			if constructors > 1 {
+				p.fail("BX2005", "class may contain only one unassigned anonymous constructor")
+			}
+		} else if member.Type != ASSIGNMENT || len(member.Children) == 0 || member.Children[0].Type != IDENTIFIER {
+			p.fail("BX2005", "class body requires named fields, methods, or an unassigned anonymous constructor")
+		}
+	}
+	class := NewToken(name.Name, CLASS_DECL, tok.Line, body.Children)
+	class.Base = base
+	return class
+}
+
 func (p *Parser) Parse() {
 	p.Output = []Node{}
+	p.Diagnostics = nil
 
 	for !p.AtEnd() {
 		p.skipComments()
@@ -567,7 +687,7 @@ func (p *Parser) Parse() {
 		}
 
 		start := p.Pos
-		node := p.parseStatement()
+		node := p.parseRecoveringStatement()
 		if node.Type != ILLEGAL {
 			p.Output = append(p.Output, node)
 		}
@@ -576,4 +696,25 @@ func (p *Parser) Parse() {
 			p.Consume()
 		}
 	}
+}
+
+func (p *Parser) parseRecoveringStatement() (node Node) {
+	start := p.Pos
+	defer func() {
+		if failure := recover(); failure != nil {
+			if _, ok := failure.(syntaxFailure); !ok {
+				panic(failure)
+			}
+			// Resume at the next source line; a malformed statement is discarded.
+			line := p.Current().Line
+			if p.Pos == start && !p.AtEnd() {
+				p.Consume()
+			}
+			for !p.AtEnd() && p.Current().Line <= line {
+				p.Consume()
+			}
+			node = Node{Type: ILLEGAL}
+		}
+	}()
+	return p.parseStatement()
 }

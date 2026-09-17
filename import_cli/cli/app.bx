@@ -1,0 +1,36 @@
+import frontend
+from cli import prompt
+import std.serialization as json
+
+execute = (line) => {
+    lexed = frontend.tokenize(line)
+    if(lexed.error.is_empty().not(), () => { print(lexed.error) }, () => {
+        command = frontend.parse(lexed.tokens)
+        if(command.error.is_empty().not(), () => { print(command.error) }, () => {
+            if(command.name.eq("help"), () => {
+                print("help | echo TEXT... | add NUMBER NUMBER | tokens TEXT... | parse COMMAND... | exit")
+            })
+            if(command.name.eq("echo"), () => { print(command.args.join(" ")) })
+            if(command.name.eq("add"), () => {
+                left = command.args[0].to_float()
+                right = command.args[1].to_float()
+                if([left.typeof, right.typeof].contains("null"), () => {
+                    print("add expects two valid numbers.")
+                }, () => { print(left.add(right)) })
+            })
+            if(command.name.eq("tokens"), () => { print(json.json_encode(lexed.tokens.slice(1))) })
+            if(command.name.eq("parse"), () => { print(json.json_encode(frontend.parse(lexed.tokens.slice(1)))) })
+        })
+    })
+}
+
+run = () => {
+    print("BLBX import demo. Type help; exit or an empty line closes the CLI.")
+    session = { "running": true }
+    while(session.running, () => {
+        line = input(prompt)
+        if(["", "exit"].contains(line.trim()), () => {
+            session.running = false
+        }, () => { execute(line) })
+    })
+}

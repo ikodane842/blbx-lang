@@ -1,6 +1,10 @@
 package lexer
 
-import "unicode"
+import (
+	"blbx_lang/syntax/diagnostic"
+	"fmt"
+	"unicode"
+)
 
 func IsAlphanumeric(s rune) bool {
 	if !unicode.IsLetter(s) && !unicode.IsDigit(s) {
@@ -18,13 +22,30 @@ func IsIdentifierStart(r rune) bool {
 }
 
 type Lexer struct {
-	Input  []rune
-	Output []LexerToken
-	Pos    int
+	Input       []rune
+	Output      []LexerToken
+	Pos         int
+	Diagnostics []diagnostic.Diagnostic
+	start       int
+	lines       []int
+	columns     []int
 }
 
 func (l *Lexer) Set(s string) {
-	l.Input = []rune(s)
+	*l = Lexer{Input: []rune(s)}
+	line, column := 1, 1
+	for _, r := range l.Input {
+		l.lines = append(l.lines, line)
+		l.columns = append(l.columns, column)
+		if r == '\n' {
+			line++
+			column = 1
+		} else {
+			column++
+		}
+	}
+	l.lines = append(l.lines, line)
+	l.columns = append(l.columns, column)
 }
 
 func (l *Lexer) Get() []LexerToken {
@@ -39,7 +60,19 @@ func (l *Lexer) Consume() rune {
 
 func (l *Lexer) AddToken(_name string, _type TokenType, _line int) {
 	new_token := NewToken(_name, _type, _line)
+	new_token.Line = l.lines[l.start]
+	new_token.Column = l.columns[l.start]
+	new_token.EndLine = l.lines[l.Pos]
+	new_token.EndColumn = l.columns[l.Pos]
 	l.Output = append(l.Output, new_token)
+}
+
+func (l *Lexer) report(code, message string) {
+	l.Diagnostics = append(l.Diagnostics, diagnostic.Diagnostic{
+		Line: l.lines[l.start], Column: l.columns[l.start],
+		EndLine: l.lines[l.Pos], EndColumn: l.columns[l.Pos],
+		Severity: "error", Code: code, Message: message,
+	})
 }
 
 func (l *Lexer) Current() rune {
@@ -94,6 +127,8 @@ func (l *Lexer) readString(line int) {
 	// skip closing quote
 	if !l.AtEnd() {
 		l.Consume()
+	} else {
+		l.report("BX1002", "unterminated string; expected closing quote")
 	}
 
 	l.AddToken(string(value), STRING, line)
@@ -110,6 +145,15 @@ func (l *Lexer) readNamespace(line int) {
 	value = string(l.Input[start:l.Pos])
 
 	switch value {
+	case "extends":
+		l.AddToken(value, EXTENDS, line)
+		return
+	case "class":
+		l.AddToken(value, CLASS, line)
+		return
+	case "self":
+		l.AddToken(value, SELF, line)
+		return
 	case "return":
 		l.AddToken(value, RETURN, line)
 		return
@@ -200,16 +244,18 @@ func (l *Lexer) readMultiLineComment(line *int) {
 
 		l.Consume()
 	}
+	l.report("BX1003", "unterminated block comment; expected */")
 }
 
 func (l *Lexer) Tokenize() {
 	line := 1
 
 	for !l.AtEnd() {
+		l.start = l.Pos
 		ch := l.Current()
 
 		// handle whitespace
-		if ch == ' ' || ch == '\t' {
+		if ch == ' ' || ch == '\t' || ch == '\r' || (l.Pos == 0 && ch == '\uFEFF') {
 			l.Consume()
 			continue
 		}
@@ -342,5 +388,8 @@ func (l *Lexer) Tokenize() {
 		}
 
 		l.Consume()
+		l.report("BX1001", fmt.Sprintf("unexpected character %q", ch))
 	}
+	l.start = l.Pos
+	l.AddToken("", EOF, l.lines[l.Pos])
 }

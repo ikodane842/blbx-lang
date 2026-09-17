@@ -1,0 +1,2 @@
+// This file marks models as an importable directory.
+from models.token import Token

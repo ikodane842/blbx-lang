@@ -1,13 +1,27 @@
 {
   "output": [
-    "im happy"
+    "7",
+    "one",
+    "two"
   ],
   "globals": {
-    "command": {
+    "add": {
+      "kind": "function",
+      "name": "add"
+    },
+    "classA": {
       "kind": "object",
       "value": {
-        "hello": {
+        "init": {
           "kind": "function"
+        },
+        "name": {
+          "kind": "string",
+          "value": "one"
+        },
+        "value": {
+          "kind": "string",
+          "value": "two"
         }
       }
     }

@@ -23,6 +23,14 @@ func Lower(nodes []parser.Node) Node {
 
 func lowerNode(node parser.Node) Node {
 	switch node.Type {
+	case parser.ARRAY_PATTERN:
+		return lowerChildren(node, ArrayPattern)
+	case parser.OBJECT_PATTERN:
+		return lowerChildren(node, ObjectPattern)
+	case parser.PATTERN_FIELD:
+		return lowerChildren(node, PatternField)
+	case parser.REST_PATTERN:
+		return lowerChildren(node, RestPattern)
 	case parser.INTEGER_LITERAL:
 		return literal(node, "integer")
 	case parser.FLOAT_LITERAL:
@@ -49,6 +57,13 @@ func lowerNode(node parser.Node) Node {
 		return lowerCall(node)
 	case parser.FUNCTION_DECL:
 		return lowerFunction(node)
+	case parser.CLASS_DECL:
+		class := lowerChildren(node, Class)
+		if node.Base != nil {
+			base := lowerNode(*node.Base)
+			class.Base = &base
+		}
+		return class
 	case parser.RETURN_STATEMENT:
 		return lowerChildren(node, Return)
 	case parser.ASSERT_STATEMENT:
@@ -124,6 +139,9 @@ func lowerCall(node parser.Node) Node {
 	}
 
 	call := lowerChildren(node, callType)
+	if node.DirectCall {
+		call.DataType = "direct-call"
+	}
 	call.Name = node.Name
 	return call
 }

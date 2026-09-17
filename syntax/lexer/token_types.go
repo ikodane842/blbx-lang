@@ -31,10 +31,20 @@ const (
 	COMMA
 	DOT
 	STAR
+	EOF
+	CLASS
+	SELF
+	EXTENDS
 )
 
 func (tt TokenType) String() string {
 	switch tt {
+	case EXTENDS:
+		return "EXTENDS"
+	case CLASS:
+		return "CLASS"
+	case SELF:
+		return "SELF"
 	case BOOLEAN:
 		return "BOOLEAN"
 	case INTEGER:

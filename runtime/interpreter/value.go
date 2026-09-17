@@ -18,6 +18,7 @@ const (
 	ArrayKind    Kind = "array"
 	ObjectKind   Kind = "object"
 	FunctionKind Kind = "function"
+	ClassKind    Kind = "class"
 )
 
 type Value struct {
@@ -29,9 +30,18 @@ type Value struct {
 	Array    []Value
 	Object   map[string]Value
 	Function *Function
+	Class    *Class
+}
+
+type Class struct {
+	Parent *Class
+	Name   string
+	Body   []ir.Node
+	Env    *Scope
 }
 
 type Function struct {
+	Native func([]Value) (Value, error)
 	Name   string
 	Params []Param
 	Body   ir.Node
@@ -87,7 +97,7 @@ func (v Value) IsTruthy() bool {
 		return v.String != ""
 	case ArrayKind:
 		return len(v.Array) > 0
-	case ObjectKind, FunctionKind:
+	case ObjectKind, FunctionKind, ClassKind:
 		return true
 	default:
 		return false
@@ -115,6 +125,9 @@ func (v Value) Display() string {
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	case ObjectKind:
+		if v.Class != nil {
+			return "<" + v.Class.Name + " instance>"
+		}
 		parts := []string{}
 		for key, item := range v.Object {
 			parts = append(parts, key+": "+item.Display())
@@ -125,6 +138,8 @@ func (v Value) Display() string {
 			return "<function " + v.Function.Name + ">"
 		}
 		return "<function>"
+	case ClassKind:
+		return "<class " + v.Class.Name + ">"
 	default:
 		return "null"
 	}
@@ -171,6 +186,11 @@ func isNumeric(v Value) bool {
 
 func (v Value) MarshalJSON() ([]byte, error) {
 	switch v.Kind {
+	case ClassKind:
+		return json.Marshal(struct {
+			Kind Kind   `json:"kind"`
+			Name string `json:"name"`
+		}{ClassKind, v.Class.Name})
 	case BooleanKind:
 		return json.Marshal(struct {
 			Kind  Kind `json:"kind"`

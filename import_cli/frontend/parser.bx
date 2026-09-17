@@ -1,0 +1,19 @@
+parse = (tokens) => {
+    command = { "name": "", "args": [], "error": "" }
+    if(tokens.is_empty(), () => { command.error = "Enter a command." }, () => {
+        command.name = tokens.first().text.lower()
+        for(tokens.slice(1), (cursor) => {
+            command.args = command.args.append(cursor.elem().text)
+        })
+        if(["help", "echo", "add", "tokens", "parse", "exit"].contains(command.name).not(), () => {
+            command.error = "Unknown command: ".concat(command.name)
+        })
+        if(command.name.eq("add"), () => {
+            if(command.args.length.eq(2).not(), () => { command.error = "Usage: add NUMBER NUMBER" })
+        })
+        if(["help", "exit"].contains(command.name), () => {
+            if(command.args.is_empty().not(), () => { command.error = "This command takes no arguments." })
+        })
+    })
+    return command
+}

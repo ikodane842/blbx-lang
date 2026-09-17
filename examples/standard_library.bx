@@ -1,0 +1,11 @@
+import std.strings as strings
+import std.collections as collections
+import std.serialization as json
+import std.math as math
+import std.time as time
+
+print(strings.join(strings.split("hello,BLBX", ","), " "))
+print(collections.range(5).join(", "))
+print(math.sqrt(81))
+print(json.json_encode({"language": "BLBX", "ready": true}))
+print(time.format(0))
