@@ -1,6 +1,9 @@
 package parser
 
-import "blbx_lang/syntax/lexer"
+import (
+	"blbx_lang/syntax/diagnostic"
+	"blbx_lang/syntax/lexer"
+)
 
 func (p *Parser) startsDestructuring() bool {
 	if p.Current().Type != lexer.OPEN_BRACKET && p.Current().Type != lexer.OPEN_BRACE {
@@ -26,10 +29,10 @@ func (p *Parser) parsePattern(names map[string]bool) Node {
 	tok := p.Current()
 	if tok.Type == lexer.IDENTIFIER {
 		if tok.Name == "null" || tok.Name == "true" || tok.Name == "false" {
-			p.fail("BX2003", "pattern target must be a variable name")
+			p.fail(diagnostic.InvalidTarget, "pattern target must be a variable name")
 		}
 		if names[tok.Name] {
-			p.fail("BX2003", "duplicate binding in destructuring pattern")
+			p.fail(diagnostic.DuplicateBinding, "duplicate binding in destructuring pattern")
 		}
 		names[tok.Name] = true
 		return p.parseIdentifier()
@@ -38,7 +41,7 @@ func (p *Parser) parsePattern(names map[string]bool) Node {
 	if tok.Type == lexer.OPEN_BRACE {
 		kind, end = OBJECT_PATTERN, lexer.CLOSED_BRACE
 	} else if tok.Type != lexer.OPEN_BRACKET {
-		p.fail("BX2003", "expected binding name, array pattern, or object pattern")
+		p.fail(diagnostic.InvalidTarget, "expected binding name, array pattern, or object pattern")
 	}
 	p.Consume()
 	children := []Node{}
@@ -49,13 +52,13 @@ func (p *Parser) parsePattern(names map[string]bool) Node {
 			p.Consume()
 			p.Consume()
 			if p.Current().Type != lexer.IDENTIFIER {
-				p.fail("BX2003", "rest target must be a variable name")
+				p.fail(diagnostic.InvalidTarget, "rest target must be a variable name")
 			}
 			target := p.parsePattern(names)
 			children = append(children, NewToken("rest", REST_PATTERN, rest.Line, []Node{target}))
 			p.match(lexer.COMMA)
 			if p.Current().Type != end {
-				p.fail("BX2003", "rest binding must be last")
+				p.fail(diagnostic.RestPosition, "rest binding must be last")
 			}
 			break
 		}
@@ -64,10 +67,10 @@ func (p *Parser) parsePattern(names map[string]bool) Node {
 		} else {
 			key := p.Current()
 			if key.Type != lexer.IDENTIFIER && key.Type != lexer.STRING {
-				p.fail("BX2003", "expected object field name")
+				p.fail(diagnostic.InvalidTarget, "expected object field name")
 			}
 			if keys[key.Name] {
-				p.fail("BX2003", "duplicate key in object pattern")
+				p.fail(diagnostic.DuplicateKey, "duplicate key in object pattern")
 			}
 			keys[key.Name] = true
 			var target Node

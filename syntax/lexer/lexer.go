@@ -128,7 +128,7 @@ func (l *Lexer) readString(line int) {
 	if !l.AtEnd() {
 		l.Consume()
 	} else {
-		l.report("BX1002", "unterminated string; expected closing quote")
+		l.report(diagnostic.UnclosedString, "unterminated string; expected closing quote")
 	}
 
 	l.AddToken(string(value), STRING, line)
@@ -244,7 +244,7 @@ func (l *Lexer) readMultiLineComment(line *int) {
 
 		l.Consume()
 	}
-	l.report("BX1003", "unterminated block comment; expected */")
+	l.report(diagnostic.UnclosedComment, "unterminated block comment; expected */")
 }
 
 func (l *Lexer) Tokenize() {
@@ -388,7 +388,7 @@ func (l *Lexer) Tokenize() {
 		}
 
 		l.Consume()
-		l.report("BX1001", fmt.Sprintf("unexpected character %q", ch))
+		l.report(diagnostic.UnknownCharacter, fmt.Sprintf("unexpected character %q", ch))
 	}
 	l.start = l.Pos
 	l.AddToken("", EOF, l.lines[l.Pos])

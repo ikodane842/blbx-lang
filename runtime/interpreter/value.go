@@ -19,9 +19,12 @@ const (
 	ObjectKind   Kind = "object"
 	FunctionKind Kind = "function"
 	ClassKind    Kind = "class"
+	TaskKind     Kind = "task"
 )
 
 type Value struct {
+	Task     *Task
+	Cursor   bool
 	Kind     Kind
 	Boolean  bool
 	Integer  int64
@@ -41,11 +44,12 @@ type Class struct {
 }
 
 type Function struct {
-	Native func([]Value) (Value, error)
-	Name   string
-	Params []Param
-	Body   ir.Node
-	Env    *Scope
+	NativeContext func(*Interpreter, []Value) (Value, error)
+	Native        func([]Value) (Value, error)
+	Name          string
+	Params        []Param
+	Body          ir.Node
+	Env           *Scope
 }
 
 type Param struct {
@@ -86,6 +90,9 @@ func FunctionValue(fn *Function) Value {
 }
 
 func (v Value) IsTruthy() bool {
+	if v.Kind == TaskKind {
+		return true
+	}
 	switch v.Kind {
 	case BooleanKind:
 		return v.Boolean
@@ -109,6 +116,9 @@ func (v Value) TypeName() string {
 }
 
 func (v Value) Display() string {
+	if v.Kind == TaskKind {
+		return "<task>"
+	}
 	switch v.Kind {
 	case BooleanKind:
 		return strconv.FormatBool(v.Boolean)
@@ -186,6 +196,10 @@ func isNumeric(v Value) bool {
 
 func (v Value) MarshalJSON() ([]byte, error) {
 	switch v.Kind {
+	case TaskKind:
+		return json.Marshal(struct {
+			Kind Kind `json:"kind"`
+		}{TaskKind})
 	case ClassKind:
 		return json.Marshal(struct {
 			Kind Kind   `json:"kind"`

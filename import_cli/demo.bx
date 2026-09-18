@@ -1,8 +1,0 @@
-// A noninteractive import smoke test.
-from cli.app import execute
-
-execute("help")
-execute("echo \"hello from BLBX imports\"")
-execute("add 12 30")
-execute("tokens echo \"two words\"")
-execute("parse echo \"two words\"")

@@ -64,7 +64,7 @@ func (p *Parser) Set(tokens []lexer.LexerToken) {
 
 func (p *Parser) Expect(tt lexer.TokenType) {
 	if p.AtEnd() || p.Current().Type != tt {
-		p.fail("BX2001", fmt.Sprintf("expected %v, got %s", tt, p.describe()))
+		p.fail(diagnostic.UnexpectedToken, fmt.Sprintf("expected %v, got %s", tt, p.describe()))
 	}
 
 	p.Consume()
@@ -82,17 +82,21 @@ func (p *Parser) describe() string {
 }
 
 func (p *Parser) fail(code, message string) {
+	p.report(code, message)
+	panic(syntaxFailure{})
+}
+
+func (p *Parser) report(code, message string) {
 	t := p.Current()
 	p.Diagnostics = append(p.Diagnostics, diagnostic.Diagnostic{
 		Line: t.Line, Column: t.Column, EndLine: t.EndLine, EndColumn: t.EndColumn,
 		Severity: "error", Code: code, Message: message,
 	})
-	panic(syntaxFailure{})
 }
 
 func (p *Parser) enter() func() {
 	if p.depth >= 256 {
-		p.fail("BX2004", "syntax nesting exceeds limit of 256")
+		p.fail(diagnostic.NestingLimit, "syntax nesting exceeds limit of 256")
 	}
 	p.depth++
 	return func() { p.depth-- }
@@ -239,17 +243,31 @@ func (p *Parser) parseArguments() []Node {
 		}
 
 		p.skipComments()
-		if !p.match(lexer.COMMA) {
-			if p.startsExpression() {
-				continue
-			}
-
+		if !p.listSeparator(lexer.CLOSED_PAREN, "function arguments") {
 			break
 		}
 	}
 
 	p.Expect(lexer.CLOSED_PAREN)
 	return args
+}
+
+// Newlines and comments do not replace commas in delimited lists. A comma
+// before the closing delimiter is allowed, but empty entries are not.
+func (p *Parser) listSeparator(end lexer.TokenType, context string) bool {
+	if p.Current().Type == end {
+		return false
+	}
+	if p.match(lexer.COMMA) {
+		return true
+	}
+	message := fmt.Sprintf("expected ',' between %s, got %s", context, p.describe())
+	if p.startsExpression() {
+		p.report(diagnostic.MissingComma, message)
+		return true
+	}
+	p.fail(diagnostic.MissingComma, message)
+	return false
 }
 
 func (p *Parser) parseFunctionCall() Node {
@@ -281,7 +299,7 @@ func (p *Parser) parseImportPath() ([]Node, string) {
 	parts := []Node{}
 
 	if p.Current().Type != lexer.IDENTIFIER {
-		p.fail("BX2001", "expected module path")
+		p.fail(diagnostic.UnexpectedToken, "expected module path")
 	}
 
 	for !p.AtEnd() {
@@ -295,7 +313,7 @@ func (p *Parser) parseImportPath() ([]Node, string) {
 
 		p.Consume()
 		if p.AtEnd() {
-			p.fail("BX2001", "expected module name after '.'")
+			p.fail(diagnostic.UnexpectedToken, "expected module name after '.'")
 		}
 	}
 
@@ -328,7 +346,7 @@ func (p *Parser) parseFromImportStatement() Node {
 
 	p.Expect(lexer.IMPORT)
 	if p.Current().Type != lexer.IDENTIFIER {
-		p.fail("BX2001", "expected imported name")
+		p.fail(diagnostic.UnexpectedToken, "expected imported name")
 	}
 
 	imports := []Node{}
@@ -350,7 +368,7 @@ func (p *Parser) parseFromImportStatement() Node {
 			break
 		}
 		if p.Current().Type != lexer.IDENTIFIER {
-			p.fail("BX2001", "expected imported name after ','")
+			p.fail(diagnostic.UnexpectedToken, "expected imported name after ','")
 		}
 	}
 
@@ -378,7 +396,7 @@ func (p *Parser) parseArrayLiteral() Node {
 		}
 
 		p.skipComments()
-		if !p.match(lexer.COMMA) {
+		if !p.listSeparator(lexer.CLOSED_BRACKET, "array elements") {
 			break
 		}
 	}
@@ -390,6 +408,7 @@ func (p *Parser) parseArrayLiteral() Node {
 func (p *Parser) parseBlock() Node {
 	tok := p.Consume()
 	body := []Node{}
+	object := p.Current().Type == lexer.STRING && p.Peek(1).Type == lexer.ASSIGN && p.Peek(1).Name == ":"
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_BRACE {
 		p.skipComments()
@@ -398,12 +417,19 @@ func (p *Parser) parseBlock() Node {
 		}
 
 		start := p.Pos
+		if object && !(p.Current().Type == lexer.STRING && p.Peek(1).Type == lexer.ASSIGN && p.Peek(1).Name == ":") {
+			p.fail(diagnostic.ObjectField, "expected a quoted object key followed by ':'")
+		}
 		stmt := p.parseStatement()
 		if stmt.Type != ILLEGAL {
 			body = append(body, stmt)
 		}
-		if stmt.Type == ASSIGNMENT && len(stmt.Children) > 0 && stmt.Children[0].Type == STRING_LITERAL {
-			p.match(lexer.COMMA)
+		if object {
+			if !p.listSeparator(lexer.CLOSED_BRACE, "object fields") {
+				break
+			}
+		} else if stmt.Type == ASSIGNMENT && len(stmt.Children) > 0 && stmt.Children[0].Type == STRING_LITERAL {
+			p.fail(diagnostic.ObjectField, "object fields cannot be mixed with block statements")
 		}
 
 		if p.Pos == start {
@@ -436,7 +462,7 @@ func (p *Parser) parseParenExpression() Node {
 		}
 
 		p.skipComments()
-		if !p.match(lexer.COMMA) {
+		if !p.listSeparator(lexer.CLOSED_PAREN, "parenthesized items or parameters") {
 			break
 		}
 	}
@@ -452,7 +478,7 @@ func (p *Parser) parseParenExpression() Node {
 
 func (p *Parser) parsePrimary() Node {
 	if p.AtEnd() {
-		p.fail("BX2002", "expected expression, got end of file")
+		p.fail(diagnostic.ExpectedExpression, "expected expression, got end of file")
 	}
 
 	switch p.Current().Type {
@@ -489,7 +515,7 @@ func (p *Parser) parsePrimary() Node {
 			}
 			for _, param := range validateParams {
 				if param.Type == IDENTIFIER && param.Name == "self" {
-					p.fail("BX2003", "self cannot be used as a parameter")
+					p.fail(diagnostic.SelfBinding, "self cannot be used as a parameter")
 				}
 			}
 			arrow := p.Consume()
@@ -501,7 +527,7 @@ func (p *Parser) parsePrimary() Node {
 		p.Consume()
 		return Node{Type: ILLEGAL}
 	default:
-		p.fail("BX2002", fmt.Sprintf("expected expression, got %s", p.describe()))
+		p.fail(diagnostic.ExpectedExpression, fmt.Sprintf("expected expression, got %s", p.describe()))
 		return Node{Type: ILLEGAL}
 	}
 }
@@ -568,10 +594,10 @@ func (p *Parser) parseBinaryExpression() Node {
 func (p *Parser) parseAssignment(name Node) Node {
 	defer p.enter()()
 	if name.Type == IDENTIFIER && name.Name == "self" {
-		p.fail("BX2003", "self cannot be reassigned or used as a parameter")
+		p.fail(diagnostic.SelfBinding, "self cannot be reassigned or used as a parameter")
 	}
 	if p.Current().Name != "=>" && name.Type != IDENTIFIER && name.Type != NAMESPACE && name.Type != INDEX && !(name.Type == STRING_LITERAL && p.Current().Name == ":") {
-		p.fail("BX2003", "assignment target must be a name, member, or index")
+		p.fail(diagnostic.InvalidTarget, "assignment target must be a name, member, or index")
 	}
 	assign := p.Consume()
 	value := p.parseExpression()
@@ -657,7 +683,7 @@ func (p *Parser) parseClass() Node {
 		base = &value
 	}
 	if p.Current().Type != lexer.OPEN_BRACE {
-		p.fail("BX2001", "expected class body '{'")
+		p.fail(diagnostic.UnexpectedToken, "expected class body '{'")
 	}
 	body := p.parseBlock()
 	constructors := 0
@@ -665,10 +691,10 @@ func (p *Parser) parseClass() Node {
 		if member.Type == FUNCTION_DECL {
 			constructors++
 			if constructors > 1 {
-				p.fail("BX2005", "class may contain only one unassigned anonymous constructor")
+				p.fail(diagnostic.DuplicateConstructor, "class may contain only one unassigned anonymous constructor")
 			}
 		} else if member.Type != ASSIGNMENT || len(member.Children) == 0 || member.Children[0].Type != IDENTIFIER {
-			p.fail("BX2005", "class body requires named fields, methods, or an unassigned anonymous constructor")
+			p.fail(diagnostic.ClassSyntax, "class body requires named fields, methods, or an unassigned anonymous constructor")
 		}
 	}
 	class := NewToken(name.Name, CLASS_DECL, tok.Line, body.Children)

@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"blbx_lang/syntax/diagnostic"
 	"fmt"
 	"math"
 	"os"
@@ -17,6 +18,9 @@ func standardModule(moduleName string) (Value, bool) {
 }
 
 func standardModuleAt(moduleName, baseDir string) (Value, bool) {
+	if moduleName == "std.task" {
+		return taskModule(), true
+	}
 	resolve := func(path string) string {
 		if baseDir == "" || filepath.IsAbs(path) {
 			return path
@@ -24,23 +28,29 @@ func standardModuleAt(moduleName, baseDir string) (Value, bool) {
 		return filepath.Join(baseDir, path)
 	}
 	exports := map[string]Value{}
+	failureCode := map[string]string{
+		"std.strings": diagnostic.StringsFailure, "std.files": diagnostic.FilesFailure,
+		"std.time": diagnostic.TimeFailure, "std.networking": diagnostic.NetworkFailure,
+		"std.collections": diagnostic.CollectionsFailure, "std.serialization": diagnostic.SerializationFailure,
+		"std.math": diagnostic.MathFailure, "std.processes": diagnostic.ProcessFailure,
+	}[moduleName]
 	add := func(name string, kinds []Kind, fn func([]Value) (Value, error)) {
 		qualified := strings.TrimPrefix(moduleName, "std.") + "." + name
 		exports[name] = FunctionValue(&Function{Name: name, Native: func(args []Value) (Value, error) {
 			if len(args) != len(kinds) {
-				return Null(), fmt.Errorf("std.%s expects %d arguments, got %d", qualified, len(kinds), len(args))
+				return Null(), diagnostic.RuntimeCode(diagnostic.ArgumentCount, fmt.Errorf("std.%s expects %d arguments, got %d", qualified, len(kinds), len(args)))
 			}
 			for index, kind := range kinds {
 				if kind == "number" && isNumeric(args[index]) {
 					continue
 				}
 				if kind != "" && args[index].Kind != kind {
-					return Null(), fmt.Errorf("std.%s argument %d must be %s", qualified, index+1, kind)
+					return Null(), diagnostic.RuntimeCode(diagnostic.ArgumentType, fmt.Errorf("std.%s argument %d must be %s", qualified, index+1, kind))
 				}
 			}
 			value, err := fn(args)
 			if err != nil {
-				return Null(), fmt.Errorf("std.%s: %w", qualified, err)
+				return Null(), diagnostic.RuntimeCode(failureCode, fmt.Errorf("std.%s: %w", qualified, err))
 			}
 			return value, nil
 		}})

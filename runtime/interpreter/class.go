@@ -1,6 +1,9 @@
 package interpreter
 
-import "blbx_lang/syntax/ir"
+import (
+	"blbx_lang/syntax/diagnostic"
+	"blbx_lang/syntax/ir"
+)
 
 // Bind a copy so calling a shared method on one object never changes another
 // object's receiver. Extracted methods retain their receiver as well.
@@ -45,13 +48,13 @@ func (i *Interpreter) instantiate(class *Class, args []Value) (evalResult, error
 			member := &declaring.Body[index]
 			if member.Type == ir.Function {
 				if ownConstructor != nil {
-					return evalResult{}, runtimeError(*member, "class may contain only one constructor")
+					return evalResult{}, runtimeError(diagnostic.DuplicateConstructor, *member, "class may contain only one constructor")
 				}
 				ownConstructor = member
 				continue
 			}
 			if member.Type != ir.Assign || len(member.Children) < 2 || member.Children[0].Type != ir.Identifier {
-				return evalResult{}, runtimeError(*member, "invalid class member")
+				return evalResult{}, runtimeError(diagnostic.InvalidClass, *member, "invalid class member")
 			}
 			value, err := i.evalAssignmentValue(member.Children[len(member.Children)-1], fields)
 			if err != nil || value.signal != noSignal {
@@ -74,7 +77,7 @@ func (i *Interpreter) instantiate(class *Class, args []Value) (evalResult, error
 		}
 		// A constructor's return value never replaces the new instance.
 	} else if len(args) != 0 {
-		return evalResult{}, runtimeError(ir.Node{Name: class.Name}, "class %s has no constructor and accepts no arguments", class.Name)
+		return evalResult{}, runtimeError(diagnostic.ArgumentCount, ir.Node{Name: class.Name}, "class %s has no constructor and accepts no arguments", class.Name)
 	}
 	return normal(instance)
 }

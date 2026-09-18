@@ -1,0 +1,42 @@
+// Run: blbx run examples/language_tour.bx
+import std.math as math
+import std.serialization as json
+
+print("BLBX language tour")
+print((6).mul(7))
+print([].to_bool().not())
+
+make_adder = (base) => { return (value) => { return base.add(value) } }
+add_ten = make_adder(10)
+print(add_ten(5))
+
+[first, second, ...remaining] = [1, 2, 3, 4]
+print(remaining.join(","))
+person = {"name": "Ada", "age": 36}
+{name, age: years} = person
+print(name)
+print(years)
+
+class Named {
+    (name) => { self.name = name }
+    label = () => { return self.name }
+}
+class Token extends Named {
+    label = () => { return "Token: ".concat(self.name) }
+}
+print(Token("STRING").label())
+
+recurse = (items) => {
+    for(items, (cursor) => {
+        if(cursor.elem().typeof().eq("array"),
+            () => { recurse(cursor.elem()) },
+            () => { print(cursor.elem()) }
+        )
+    })
+}
+recurse([1, [2, 3], [4, [5]]])
+counter = 0
+while(counter.lt(3), () => { counter = counter.add(1) })
+print(counter)
+print(math.sqrt(81))
+print(json.json_decode("{\"ready\":true}").ready)

@@ -1,0 +1,3 @@
+make sure that commas are expected inside of function calls, especially for if().
+make sure that commas are expected inside of arrays and objects.
+add errors for undefined variables

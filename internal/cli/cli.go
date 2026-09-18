@@ -24,7 +24,7 @@ Usage:
   blbx version
   blbx help
 
-check validates syntax without executing code or resolving imports.
+check validates syntax and undefined names without executing code or resolving imports.
 Use - to read source from stdin. Options must precede file paths.
 Exit codes: 0 success, 1 source/runtime errors, 2 usage or I/O errors.
 `
@@ -111,7 +111,7 @@ func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			data, err = os.ReadFile(path)
 		}
 		if err != nil {
-			diagnostics = append(diagnostics, diagnostic.Diagnostic{File: path, Line: 1, Column: 1, EndLine: 1, EndColumn: 1, Severity: "error", Code: "BX0001", Message: err.Error()})
+			diagnostics = append(diagnostics, diagnostic.Diagnostic{File: path, Line: 1, Column: 1, EndLine: 1, EndColumn: 1, Severity: "error", Code: diagnostic.SourceRead, Message: err.Error()})
 			exitCode = 2
 			continue
 		}

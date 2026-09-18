@@ -2,8 +2,10 @@ package interpreter
 
 import (
 	"blbx_lang/syntax/check"
+	"blbx_lang/syntax/diagnostic"
 	"blbx_lang/syntax/ir"
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -118,7 +120,7 @@ func (i *Interpreter) SetCurrentFile(path string) {
 func (i *Interpreter) ExecuteFile(path string) (Result, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Result{}, err
+		return Result{}, diagnostic.Diagnostic{Phase: "runtime", Code: diagnostic.SourceRead, Severity: "error", Message: err.Error(), Cause: err, File: path}
 	}
 
 	i.SetModuleRoot(filepath.Dir(path))
@@ -126,7 +128,11 @@ func (i *Interpreter) ExecuteFile(path string) (Result, error) {
 
 	nodes, diagnostics := check.Source(path, string(data))
 	if len(diagnostics) > 0 {
-		return Result{}, diagnostics[0]
+		failures := make([]error, len(diagnostics))
+		for index := range diagnostics {
+			failures[index] = diagnostics[index]
+		}
+		return Result{}, errors.Join(failures...)
 	}
 	return i.Execute(ir.Lower(nodes))
 }
@@ -134,7 +140,7 @@ func (i *Interpreter) ExecuteFile(path string) (Result, error) {
 func (i *Interpreter) Execute(program ir.Node) (Result, error) {
 	result, err := i.eval(program, i.global)
 	if err != nil {
-		return Result{}, err
+		return Result{}, diagnostic.Runtime(err)
 	}
 
 	return Result{
@@ -170,7 +176,7 @@ func (i *Interpreter) eval(node ir.Node, scope *Scope) (evalResult, error) {
 				return base, err
 			}
 			if base.value.Kind != ClassKind || base.value.Class == nil {
-				return evalResult{}, runtimeError(node, "base of class %s must be an existing class", node.Name)
+				return evalResult{}, runtimeError(diagnostic.InvalidBase, node, "base of class %s must be an existing class", node.Name)
 			}
 			value.Class.Parent = base.value.Class
 		}
@@ -251,13 +257,13 @@ func (i *Interpreter) evalIdentifier(node ir.Node, scope *Scope) (evalResult, er
 		return normal(value)
 	}
 	if node.Name == "self" {
-		return evalResult{}, runtimeError(node, "self is only available inside an object or class instance")
+		return evalResult{}, runtimeError(diagnostic.InvalidSelf, node, "self is only available inside an object or class instance")
 	}
 
 	if node.Name == "null" {
 		return normal(Null())
 	}
-	return evalResult{}, runtimeError(node, "undefined name %q", node.Name)
+	return evalResult{}, runtimeError(diagnostic.UndefinedName, node, "undefined variable %q", node.Name)
 }
 
 func (i *Interpreter) evalAssign(node ir.Node, scope *Scope) (evalResult, error) {
@@ -315,7 +321,7 @@ func (i *Interpreter) evalImport(node ir.Node, scope *Scope) (evalResult, error)
 		for _, imported := range node.Children {
 			value, ok := module.Object[imported.Name]
 			if !ok {
-				return evalResult{}, runtimeError(node, "module %q has no name %q", node.Name, imported.Name)
+				return evalResult{}, runtimeError(diagnostic.MissingImportName, node, "module %q has no name %q", node.Name, imported.Name)
 			}
 
 			name := imported.Name
@@ -393,7 +399,7 @@ func (i *Interpreter) loadModule(path string) (Value, error) {
 
 	data, err := os.ReadFile(modulePath)
 	if err != nil {
-		return Null(), err
+		return Null(), diagnostic.RuntimeCode(diagnostic.SourceRead, err)
 	}
 
 	nodes, diagnostics := check.Source(modulePath, string(data))
@@ -423,13 +429,13 @@ func (i *Interpreter) loadModule(path string) (Value, error) {
 
 func (i *Interpreter) resolveModulePath(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("[blbx][runtime] empty import path")
+		return "", runtimeError(diagnostic.ImportResolution, ir.Node{}, "empty import path")
 	}
 
 	parts := strings.Split(path, ".")
 	for _, part := range parts {
 		if part == "" {
-			return "", fmt.Errorf("[blbx][runtime] invalid import path %q", path)
+			return "", runtimeError(diagnostic.ImportResolution, ir.Node{}, "invalid import path %q", path)
 		}
 	}
 
@@ -448,7 +454,7 @@ func (i *Interpreter) resolveModulePath(path string) (string, error) {
 		initParts = append(initParts, "__init__.bx")
 		initPath := filepath.Join(append([]string{root}, initParts...)...)
 		if _, err := os.Stat(initPath); err != nil {
-			return "", fmt.Errorf("[blbx][runtime] package %q requires %s", strings.Join(parts[:index], "."), initPath)
+			return "", runtimeError(diagnostic.ImportResolution, ir.Node{}, "package %q requires %s", strings.Join(parts[:index], "."), initPath)
 		}
 	}
 
@@ -464,7 +470,7 @@ func (i *Interpreter) resolveModulePath(path string) (string, error) {
 		return filepath.Abs(initPath)
 	}
 
-	return "", fmt.Errorf("[blbx][runtime] could not resolve import %q from %s", path, root)
+	return "", runtimeError(diagnostic.ImportResolution, ir.Node{}, "could not resolve import %q from %s", path, root)
 }
 
 func (i *Interpreter) assignMember(target ir.Node, value Value, scope *Scope) error {
@@ -484,7 +490,7 @@ func (i *Interpreter) assignMember(target ir.Node, value Value, scope *Scope) er
 			return err
 		}
 		if object.value.Kind != ObjectKind {
-			return runtimeError(target, "member assignment requires an object")
+			return runtimeError(diagnostic.InvalidReceiver, target, "member assignment requires an object")
 		}
 		object.value.Object[propertyRef.Name] = value
 		return nil
@@ -492,13 +498,13 @@ func (i *Interpreter) assignMember(target ir.Node, value Value, scope *Scope) er
 
 	object, ok := scope.Get(objectRef.Name)
 	if objectRef.Name == "self" && (!ok || object.Kind != ObjectKind) {
-		return runtimeError(target, "self is only available inside an object or class instance")
+		return runtimeError(diagnostic.InvalidSelf, target, "self is only available inside an object or class instance")
 	}
 	if !ok {
-		return runtimeError(target, "undefined name %q", objectRef.Name)
+		return runtimeError(diagnostic.UndefinedName, target, "undefined variable %q", objectRef.Name)
 	}
 	if object.Kind != ObjectKind {
-		return runtimeError(target, "cannot assign member %q on %s", propertyRef.Name, object.Kind)
+		return runtimeError(diagnostic.InvalidReceiver, target, "cannot assign member %q on %s", propertyRef.Name, object.Kind)
 	}
 	object.Object[propertyRef.Name] = value
 	scope.Set(objectRef.Name, object)
@@ -659,7 +665,7 @@ func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
 	}
 	if node.Name == "typeof" && node.DataType == "direct-call" {
 		if len(node.Children) != 1 {
-			return evalResult{}, runtimeError(node, "typeof expects exactly one argument")
+			return evalResult{}, runtimeError(diagnostic.ArgumentCount, node, "typeof expects exactly one argument")
 		}
 		value, err := i.eval(node.Children[0], scope)
 		if err != nil || value.signal != noSignal {
@@ -681,10 +687,10 @@ func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
 
 	callee, ok := scope.Get(node.Name)
 	if !ok {
-		return evalResult{}, runtimeError(node, "undefined function %q", node.Name)
+		return evalResult{}, runtimeError(diagnostic.UndefinedName, node, "undefined function %q", node.Name)
 	}
 	if callee.Kind != FunctionKind && callee.Kind != ClassKind {
-		return evalResult{}, runtimeError(node, "%q is %s, not callable", node.Name, callee.Kind)
+		return evalResult{}, runtimeError(diagnostic.NotCallable, node, "%q is %s, not callable", node.Name, callee.Kind)
 	}
 
 	args, result, err := i.evalArgs(node.Children, scope)
@@ -705,7 +711,7 @@ func (i *Interpreter) evalExpressionCall(node ir.Node, scope *Scope) (evalResult
 	}
 
 	if callee.value.Kind != FunctionKind && callee.value.Kind != ClassKind {
-		return evalResult{}, runtimeError(node, "%s value is not callable", callee.value.Kind)
+		return evalResult{}, runtimeError(diagnostic.NotCallable, node, "%s value is not callable", callee.value.Kind)
 	}
 
 	args, result, err := i.evalArgs(node.Children[1:], scope)
@@ -743,7 +749,7 @@ func (i *Interpreter) evalInput(node ir.Node, scope *Scope) (evalResult, error) 
 
 	text, err := i.Input.ReadString('\n')
 	if err != nil && err != io.EOF {
-		return evalResult{}, runtimeError(node, "input failed: %v", err)
+		return evalResult{}, runtimeError(diagnostic.InputFailure, node, "input failed: %v", err)
 	}
 
 	text = strings.TrimSuffix(text, "\n")
@@ -767,6 +773,21 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 	}
 
 	method := member.Children[1].Name
+	custom := false
+	if receiver.value.Kind == ObjectKind {
+		property, exists := receiver.value.Object[method]
+		custom = exists && (property.Kind == FunctionKind || property.Kind == ClassKind)
+	}
+	if !custom {
+		minimum, maximum, available := methodSignature(receiver.value, method)
+		if !available {
+			return evalResult{}, runtimeError(diagnostic.InvalidReceiver, node, "method %q is not available on %s", method, receiver.value.TypeName())
+		}
+		count := len(node.Children) - 1
+		if count < minimum || (maximum >= 0 && count > maximum) {
+			return evalResult{}, runtimeError(diagnostic.ArgumentCount, node, "invalid argument count for %s.%s: got %d", receiver.value.TypeName(), method, count)
+		}
+	}
 	// Boolean operators must decide whether to evaluate the RHS before the
 	// ordinary eager argument evaluation used by other methods.
 	if receiver.value.Kind == BooleanKind && (method == "and" || method == "or" || method == "not") {
@@ -775,7 +796,7 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 			want = 0
 		}
 		if len(node.Children)-1 != want {
-			return evalResult{}, runtimeError(node, "%s expects %d arguments", method, want)
+			return evalResult{}, runtimeError(diagnostic.ArgumentCount, node, "%s expects %d arguments", method, want)
 		}
 		if method == "not" {
 			return normal(Boolean(!receiver.value.Boolean))
@@ -791,7 +812,7 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 			return right, err
 		}
 		if right.value.Kind != BooleanKind {
-			return evalResult{}, runtimeError(node, "%s requires a boolean argument", method)
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "%s requires a boolean argument", method)
 		}
 		return normal(right.value)
 	}
@@ -800,11 +821,11 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 		return result, err
 	}
 
-	if method == "continue" {
+	if method == "continue" && !custom {
 		return evalResult{value: Null(), signal: continueSignal}, nil
 	}
 
-	if method == "break" {
+	if method == "break" && !custom {
 		return evalResult{value: Null(), signal: breakSignal}, nil
 	}
 
@@ -814,13 +835,10 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 				if method == "elem" || method == "idx" || method == "index" || method == "step" {
 					return normal(i.callMethod(receiver.value, method, args))
 				}
-				return evalResult{}, runtimeError(node, "member %q is %s, not callable", method, property.Kind)
+				return evalResult{}, runtimeError(diagnostic.NotCallable, node, "member %q is %s, not callable", method, property.Kind)
 			}
 			return i.callValue(bindReceiver(property, receiver.value), args)
 		}
-	}
-	if !knownMethod(method) {
-		return evalResult{}, runtimeError(node, "undefined method %q on %s", method, receiver.value.TypeName())
 	}
 
 	return normal(i.callMethod(receiver.value, method, args))
@@ -847,6 +865,10 @@ func (i *Interpreter) callFunction(fn *Function, args []Value) (evalResult, erro
 	if fn == nil {
 		return normal(Null())
 	}
+	if fn.NativeContext != nil {
+		value, err := fn.NativeContext(i, args)
+		return evalResult{value: value}, err
+	}
 	if fn.Native != nil {
 		value, err := fn.Native(args)
 		return evalResult{value: value}, err
@@ -855,7 +877,7 @@ func (i *Interpreter) callFunction(fn *Function, args []Value) (evalResult, erro
 	callScope := NewScope(fn.Env)
 	for index, param := range fn.Params {
 		if param.Name == "self" {
-			return evalResult{}, runtimeError(fn.Body, "self cannot be used as a parameter")
+			return evalResult{}, runtimeError(diagnostic.InvalidSelf, fn.Body, "self cannot be used as a parameter")
 		}
 		value := param.Default
 		if index < len(args) {
@@ -877,6 +899,9 @@ func (i *Interpreter) callFunction(fn *Function, args []Value) (evalResult, erro
 }
 
 func (i *Interpreter) callMethod(receiver Value, method string, args []Value) Value {
+	if method == "to_bool" {
+		return Boolean(receiver.IsTruthy())
+	}
 	if (method == "indexes" || method == "values") && receiver.Kind == ObjectKind && receiver.Class == nil && len(args) == 0 {
 		return objectEntries(receiver, method)
 	}
@@ -1020,7 +1045,9 @@ func (i *Interpreter) evalMember(node ir.Node, scope *Scope) (evalResult, error)
 		return normal(String(receiver.value.TypeName()))
 	}
 	if property == "length" {
-		return normal(lengthOf(receiver.value))
+		if receiver.value.Kind == ArrayKind || receiver.value.Kind == StringKind {
+			return normal(lengthOf(receiver.value))
+		}
 	}
 
 	if receiver.value.Kind == ObjectKind {
@@ -1029,7 +1056,7 @@ func (i *Interpreter) evalMember(node ir.Node, scope *Scope) (evalResult, error)
 		}
 	}
 
-	return evalResult{}, runtimeError(node, "undefined member %q on %s", property, receiver.value.TypeName())
+	return evalResult{}, runtimeError(diagnostic.MissingMember, node, "undefined member %q on %s", property, receiver.value.TypeName())
 }
 
 func (i *Interpreter) evalIndex(node ir.Node, scope *Scope) (evalResult, error) {
@@ -1051,7 +1078,7 @@ func (i *Interpreter) evalIndex(node ir.Node, scope *Scope) (evalResult, error) 
 			return normal(bindReceiver(value, target.value))
 		}
 
-		return evalResult{}, runtimeError(node, "undefined member %q on object", index.value.String)
+		return evalResult{}, runtimeError(diagnostic.MissingMember, node, "undefined member %q on object", index.value.String)
 	}
 
 	if target.value.Kind == ArrayKind && index.value.Kind == IntegerKind {
@@ -1145,6 +1172,7 @@ func (i *Interpreter) evalFor(node ir.Node, scope *Scope) (evalResult, error) {
 			"idx":  Integer(int64(index)),
 			"step": Integer(step),
 		})
+		loopValue.Cursor = true
 		result, err := i.callFunction(callback.value.Function, []Value{loopValue})
 		if err != nil {
 			return result, err
@@ -1217,8 +1245,8 @@ func (i *Interpreter) evalScopedValue(node ir.Node, scope *Scope) (evalResult, e
 	return result, nil
 }
 
-func runtimeError(node ir.Node, format string, args ...interface{}) error {
-	return fmt.Errorf("[blbx][runtime] line %d: %s", node.Line, fmt.Sprintf(format, args...))
+func runtimeError(code string, node ir.Node, format string, args ...interface{}) error {
+	return diagnostic.Diagnostic{Phase: "runtime", Code: code, Severity: "error", Line: node.Line, Message: fmt.Sprintf(format, args...)}
 }
 
 func lengthOf(value Value) Value {

@@ -1,0 +1,26 @@
+// Run: blbx run examples/async_tasks.bx
+import std.task as task
+import std.time as time
+
+state = {"count": 1}
+work = (number) => {
+    time.sleep(20)
+    state.count = number
+    print("worker ".concat(number))
+    return state
+}
+first = task.spawn(work, 21)
+second = task.spawn(work, 10)
+print(task.await(first).count)
+print(task.await(second).count)
+print(state.count) // 1: caller state is unchanged
+print(task.done(first))
+copy = task.await(first)
+copy.count = 99
+print(task.await(first).count) // 21: independent result copy
+
+outer = (number) => {
+    child = task.spawn((n) => { return n.mul(2) }, number)
+    return task.await(child)
+}
+print(task.await(task.spawn(outer, 6))) // 12

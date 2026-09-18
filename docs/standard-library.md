@@ -1,5 +1,7 @@
 # BLBX standard library
 
+[Documentation index](README.md) · [Language](language.md) · [Async guide](async.md)
+
 Native modules ship inside the BLBX executable. Importing them does not perform
 I/O. `check` validates import syntax without loading modules or executing calls.
 Bundled module names take precedence over files with the same dotted path.
@@ -15,9 +17,10 @@ print(data.name)
 files.write("data.json", json.json_encode(data))
 ```
 
-This is the initial standard-library API. Arguments below are required, with
+Except for the variadic `task.spawn`, arguments below are required, with
 exact arity. Bad types, failed I/O, and unsupported numeric domains raise runtime
-errors and stop execution; they do not silently return `null`. Functions are
+errors and stop execution. Documented absence cases, such as an unset environment
+variable, may return `null`. Functions are
 ordinary callable values, so aliases and `from ... import ...` work.
 
 ## Strings â€” `std.strings`
@@ -90,6 +93,12 @@ There is no server, socket, streaming, or custom-header API yet.
 
 Array singleton methods provide joining, slicing, concatenation, appending, and
 reversal. These transformations return new shallow arrays.
+`length` takes one array, string, or object; `keys` and `values` take an object;
+`range` takes an integer; `contains` takes an array and any value.
+The module functions accept class instances as objects. This differs from the
+plain-object-only `.indexes`/`.values` singleton accessors. Module `values`
+returns stored values directly, without the receiver binding performed by those
+singleton accessors; use `instance.method` to extract a bound method.
 
 ## Serialization â€” `std.serialization`
 
@@ -100,8 +109,8 @@ reversal. These transformations return new shallow arrays.
 
 JSON supports null, booleans, strings, integers, floats, arrays, and objects.
 Integers preserve signed 64-bit precision. Out-of-range JSON integers, trailing
-content, malformed input, nonfinite floats, functions, and class definitions are
-errors. Cycles or nesting deeper than 128 levels are rejected. Objects containing
+content, malformed input, nonfinite floats, functions, task handles, and class definitions are
+errors. Cycles or nesting deeper than 128 levels are rejected. Class instances serialize their stored fields without preserving class identity. Objects containing
 methods cannot be serialized directly; construct a data-only object first.
 Exponent/decimal JSON numbers decode as floats. Other formats are not yet exposed.
 
@@ -131,3 +140,96 @@ working directory and environment, and receives no stdin. Nonzero process exits
 are returned in `exit_code`; launch failures are errors. Calls time out after
 15 seconds, with up to 8 MiB each of stdout and stderr. Timeout stops the direct
 child; this API does not manage descendant process trees or background jobs.
+
+## Asynchronous tasks â€” `std.task`
+
+```text
+import std.task as task
+import std.time as time
+
+work = (value) => {
+    time.sleep(100)
+    return value.mul(2)
+}
+first = task.spawn(work, 21)
+second = task.spawn(work, 10)
+print(task.await(first))   // 42
+print(task.await(second))  // 20
+```
+
+- `spawn(function, ...arguments)` starts work concurrently and returns a `task` handle.
+- `await(handle)` waits, returns a copy of the result, and propagates worker errors as runtime errors.
+- `done(handle)` returns whether the worker has finished, including failure.
+
+Each worker receives a snapshot of captured variables and arguments. Objects,
+arrays, closures, and class instances are isolated from the caller, with cycles
+and aliases preserved within the snapshot. External effects such as file writes
+and network requests still affect the same external resources. Repeated awaits
+return independent snapshots. Nested tasks and returning closures are supported.
+
+Worker output is buffered and emitted once, by the first await. Workers have
+empty standard input. Await every task you need before the main program exits;
+unawaited tasks do not keep the CLI alive. There is currently no cancellation,
+worker pool, or task timeout. Task failures stop execution when awaited, using
+the same error behavior as other runtime errors.
+
+## More examples
+
+String transformations (no I/O):
+
+```text
+import std.strings as strings
+print(strings.replace("a-a", "a", "b")) // b-b
+print(strings.join(strings.split("red,green", ","), " / "))
+```
+
+Working with time and JSON (no external I/O):
+
+```text
+import std.time as time
+import std.serialization as json
+print(time.format(time.parse("1970-01-01T00:00:00Z")))
+text = json.json_encode({"ready": true, "items": [1, 2]})
+print(json.json_decode(text).ready)
+```
+
+File round trip (creates `data/message.txt` beside this script):
+
+```text
+import std.files as files
+files.mkdir("data")
+path = files.join("data", "message.txt")
+files.write(path, "Hello")
+files.append(path, " BLBX")
+print(files.read(path))
+print(files.list("data"))
+```
+
+HTTP GET (requires network access):
+
+```text
+import std.networking as network
+response = network.get("https://example.com")
+print(response.status)
+print(response.body)
+```
+
+Child process (requires the `blbx` executable on PATH):
+
+```text
+import std.processes as process
+result = process.run("blbx", ["version"])
+print(result.exit_code)
+print(result.stdout)
+```
+
+## Scope of the library
+
+This reference lists all current exports. There are no regular-expression,
+random-number, socket/server, binary-stream, environment-setter, file-delete,
+or date-arithmetic APIs yet. There is no standard test framework or package
+manager. Use the supported signatures rather than assuming APIs from Python,
+JavaScript, or Go are present.
+
+For state isolation, output ordering, failures, polling, nested jobs, and batching,
+see the [complete async guide](async.md).
