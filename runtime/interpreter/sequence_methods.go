@@ -9,6 +9,14 @@ import (
 // Sequence operations return new values. Arrays are shallow copies: nested
 // objects retain their identity, but the source array's elements are unchanged.
 func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
+	if receiver.Kind == TupleKind {
+		receiver.Kind = ArrayKind
+		value, ok := sequenceMethod(receiver, method, args)
+		if value.Kind == ArrayKind {
+			value.Kind = TupleKind
+		}
+		return value, ok
+	}
 	if receiver.Kind != StringKind && receiver.Kind != ArrayKind {
 		return Null(), false
 	}

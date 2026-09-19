@@ -1,6 +1,6 @@
 # Async and await usage
 
-[Documentation index](README.md) · [Language](language.md) · [Standard library](standard-library.md)
+[Documentation index](README.md) Â· [Language](language.md) Â· [Standard library](standard-library.md)
 
 BLBX runs asynchronous work through `std.task`. There are no `async` or `await`
 keywords. Ordinary functions become concurrent work when passed to `task.spawn`.
@@ -60,7 +60,8 @@ At spawn time, the runtime snapshots the function, captured scopes, and supplied
 arguments before starting the worker. Mutable BLBX objects and arrays are not
 shared with the caller. The snapshot preserves internal aliases and cycles,
 including recursive functions, closures, and class instances. Existing task
-handles are shared completion handles rather than copied workers.
+handles are shared completion handles rather than copied workers. Network
+resources are also shared external handles; closing one affects every holder.
 
 ```text
 import std.task as task
@@ -129,7 +130,9 @@ Polling is optional. A direct await is simpler when there is no other work to do
 
 ## Output and input
 
-Worker `print` output is buffered. The first await emits that buffer once,
+Worker `print` and `std.os.write_stdout` output is buffered.
+`std.os.write_stderr` has a separate buffer replayed to stderr at await.
+Script arguments are copied into workers; OS environment changes are process-wide. The first await emits that buffer once,
 before returning the result or propagating an error. Await order therefore
 controls when buffered output is displayed; completion order alone does not.
 
@@ -174,9 +177,17 @@ runtime BX4002: std.task.await: method "not" is not available on array
 Await preserves the original category/code and adds context. Missing arguments
 use BX4003, invalid argument types use BX4004, and an unexpected recovered worker
 failure uses BX4013. See [all error codes](error-codes.md).
-There is currently no catch/try construct, error-result object, or failed-status
-query beyond awaiting. An awaited error stops execution. Unawaited failures are
-not automatically reported.
+Awaited failures can be caught with `try`:
+
+```text
+import std.task as task
+job = task.spawn(() => { throw("worker failed") })
+print(try(() => { return task.await(job) }, (error) => { return error.value }))
+```
+
+The handler gets code, message, phase, and a snapshot of the user-thrown value.
+Uncaught awaited errors stop execution; unawaited failures are not reported.
+Repeated awaits can catch the same stored failure again.
 
 ## Nested tasks
 

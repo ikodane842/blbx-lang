@@ -15,6 +15,7 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 	globals := map[string]bool{"null": true}
 	classes := map[string]ir.Node{}
 	builtins := map[string]bool{"print": true, "input": true, "typeof": true, "if": true, "for": true, "while": true, "assert": true}
+	builtins["try"], builtins["throw"] = true, true
 	var bind func(ir.Node, map[string]bool)
 	bind = func(n ir.Node, names map[string]bool) {
 		if n.Type == ir.Identifier {
@@ -34,6 +35,9 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 			if len(n.Children) > 0 {
 				bind(n.Children[0], globals)
 			}
+		case ir.Interface:
+			globals[n.Name] = true
+			return
 		case ir.Class:
 			globals[n.Name] = true
 			classes[n.Name] = n
@@ -87,6 +91,13 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 			return
 		}
 		seen[n.Name] = true
+		for _, b := range n.Bases {
+			if base, ok := classes[b.Name]; ok && b.Type == ir.Identifier {
+				fields(base, names, seen)
+			} else {
+				names["*"] = true
+			}
+		}
 		if n.Base != nil {
 			if base, ok := classes[n.Base.Name]; ok && n.Base.Type == ir.Identifier {
 				fields(base, names, seen)
@@ -128,7 +139,7 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 				report(n)
 			}
 			return
-		case ir.Import:
+		case ir.Import, ir.Interface:
 			return
 		case ir.Member:
 			if len(n.Children) > 0 {
@@ -147,6 +158,7 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 			local := copyNames(names)
 			// A function may subsequently be attached to an object as a method.
 			local["self"] = true
+			local["super"] = true
 			var parameter func(ir.Node)
 			parameter = func(p ir.Node) {
 				switch p.Type {
@@ -177,11 +189,18 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 			}
 			return
 		case ir.Class:
+			for _, b := range n.Bases {
+				walk(b, names)
+			}
+			for _, b := range n.Interfaces {
+				walk(b, names)
+			}
 			if n.Base != nil {
 				walk(*n.Base, names)
 			}
 			local := copyNames(names)
 			local["self"] = true
+			local["super"] = true
 			fields(n, local, map[string]bool{})
 			for _, c := range n.Children {
 				walk(c, local)

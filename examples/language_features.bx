@@ -1,0 +1,50 @@
+// Run: blbx run examples/language_features.bx
+interface Labelled {
+    label()
+}
+class A {
+    (n) => { self.n = n }
+    label = () => { return "A" }
+}
+class B extends A {
+    label = () => { return "B".concat(super.label()) }
+}
+class C extends A {
+    label = () => { return "C".concat(super.label()) }
+}
+class D extends B, C implements Labelled {
+    (n) => { super(n) }
+    label = () => { return "D".concat(super.label()) }
+    __mul__ = (n) => { return self.n.mul(n) }
+}
+d = D(4)
+print(d.label())
+print(d * 3)
+print(d.mul(2))
+print(try(() => { throw("bad") }, (error) => { return error.value }))
+print(try(() => { [1].not() }, (error) => { return error.code }))
+a = [1, 2]
+a[0] = 9
+obj = {}
+obj["x"] = 5
+print(a)
+print(obj.x)
+print("hé"[1])
+t = (1, 2)
+print(t)
+print(t.typeof())
+print((1,).typeof())
+print(try(() => { t[0] = 9 }, (error) => { return error.code }))
+for(t, (cursor) => { print(cursor.elem()) })
+iterator = {"index": 0, "next": () => {
+    if(self.index.gte(2), () => { return {"done": true} }, () => {
+        self.index = self.index.add(1)
+        nextValue = self.index return {"done": false, "value": nextValue}
+    })
+}}
+for(iterator, (cursor) => { print(cursor.elem()) })
+import std.task as task
+job = task.spawn(() => { return d.label() })
+print(task.await(job))
+print(try(() => { task.await(task.spawn(() => { throw("task error") })) }, (error) => { return error.value }))
+

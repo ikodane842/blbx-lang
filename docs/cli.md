@@ -1,10 +1,10 @@
 # BLBX command-line reference
 
-[Documentation index](README.md) � [Language](language.md)
+[Documentation index](README.md) · [Language](language.md)
 
 ## Build and run
 
-Install Go, then build from this directory:
+Install Go, then build from the project root directory:
 
 ```powershell
 go build -o bin/blbx.exe .
@@ -17,9 +17,92 @@ On macOS/Linux, build with `go build -o bin/blbx .` and use `./bin/blbx`.
 For development, `go run . check examples/standard_library.bx` also works. Use the built
 executable when scripting exit codes; `go run` may wrap the program's exit status.
 
+Use `blbx run file.bx [arguments...]`; `std.os.args()` returns the trailing
+arguments without the executable or file path.
+
 `run` executes the supplied file, sends program output to stdout, reads input
 from stdin, and reports failures on stderr. Imports resolve using the interpreter's existing
 module rules, rooted at the entry file's directory.
+
+## Windows installation and PATH setup
+
+If you have a prebuilt Windows release, extract it first and locate `blbx.exe`.
+You do not need Go to run it. If building from source, use the `bin\blbx.exe`
+created by the build command above.
+
+1. Press **Win+R**, enter `%LOCALAPPDATA%\Programs`, and press Enter. Create a
+   folder named `BLBX` there and copy `blbx.exe` into it. Keep the executable in
+   this permanent location when updating to a new release.
+2. Open Start and search for **Edit environment variables for your account**.
+3. Under **User variables**, select **Path**, click **Edit**, then **New**.
+   If Path does not exist, create a user variable named `Path` instead.
+4. Add `%LOCALAPPDATA%\Programs\BLBX`. This entry is the directory containing
+   `blbx.exe`, not a path ending in `blbx.exe`. Do not surround the entry with
+   quotes, and preserve all existing Path entries. Confirm with **OK** in each
+   dialog. This sets PATH for your account without administrator access.
+5. Fully close and reopen your terminal application. If using an integrated
+   terminal, restart VS Code or the application hosting that terminal too;
+   opening another terminal tab can inherit the old PATH.
+
+In the new PowerShell terminal, run:
+
+```powershell
+blbx version
+blbx help
+Get-Command blbx
+where.exe blbx
+```
+
+The reported executable should be in your BLBX installation folder. You can
+now run commands from any directory:
+
+```powershell
+blbx check "C:\path\to\main.bx"
+blbx run "C:\path\to\main.bx"
+```
+
+Replace the example source path with your own file. Alternatively, change into
+your project's directory and use `blbx run main.bx`. PATH locates the executable;
+relative source-file paths still start from your terminal's current directory.
+Quote source paths containing spaces.
+
+### Temporary setup for the current PowerShell session
+
+After copying the executable to the installation folder, this makes it available
+immediately in the current terminal without changing your saved user PATH:
+
+```powershell
+$blbxInstallDir = Join-Path $env:LOCALAPPDATA 'Programs\BLBX'
+$env:Path = "$blbxInstallDir;$env:Path"
+blbx version
+```
+
+Use the permanent setup above for future terminals. Developers can instead add
+their repository's absolute `bin` directory to PATH if they want to run the
+latest locally built executable.
+
+### Troubleshooting
+
+- **“blbx is not recognized” or “The term 'blbx' is not recognized”:** confirm
+  `blbx.exe` is inside the directory added to your user Path and restart the
+  terminal application. Test the installation directly in PowerShell with
+  `& "$env:LOCALAPPDATA\Programs\BLBX\blbx.exe" version`.
+- **An older version runs:** use `where.exe blbx` to find duplicate executables
+  and `Get-Command blbx -All` to identify aliases or functions hiding the command.
+  Remove obsolete BLBX entries from PATH or adjust their order, then restart
+  your terminal.
+- **The executable runs directly but not by name:** PowerShell requires
+  `.\blbx.exe` for an executable in the current folder unless its directory is
+  on PATH. You do not need to change PowerShell's script execution policy to
+  run this executable.
+- **The source file cannot be found:** check your current directory with
+  `Get-Location`, or pass the full quoted path to the `.bx` file.
+- **The executable was moved:** update the PATH entry to its new containing
+  directory, or put it back in the installation folder.
+
+To update, close running BLBX processes and replace the executable in the same
+folder. To uninstall, delete that executable and remove its directory entry
+from your user Path; preserve the other entries.
 
 ## Check source
 
@@ -160,8 +243,8 @@ Automated tests and the tests fixture directory have been removed. Runnable
 examples remain. Build/vet and manual smoke checks do not replace regression tests.
 
 The CLI supports `run`, `check`, `help`, and `version`. BLBX is still an alpha:
-variable scope rules need refinement, indexed assignment is incomplete,
-user-function arity is permissive, and runtime errors cannot yet be caught.
+variable scope rules need refinement and user-function arity is permissive.
+Runtime errors can be caught with callback-style `try`.
 The checker validates syntax and conservatively checks undefined names. There is no general REPL or editor extension.
 
 The default version is `0.1.0-dev`. Set a version for a release build, for example:

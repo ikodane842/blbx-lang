@@ -3,6 +3,18 @@ package interpreter
 // Built-in singleton methods are selected by receiver type. A negative maximum
 // means variadic. User-defined object methods are resolved separately.
 func methodSignature(value Value, name string) (minimum, maximum int, available bool) {
+	if value.Kind == TupleKind {
+		switch name {
+		case "length", "is_empty", "first", "last", "reverse":
+			return 0, 0, true
+		case "slice":
+			return 0, 2, true
+		case "contains", "index_of":
+			return 1, 1, true
+		case "join":
+			return 0, 1, true
+		}
+	}
 	switch name {
 	case "to_str", "type", "typeof", "to_bool":
 		return 0, 0, true

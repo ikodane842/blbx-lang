@@ -16,7 +16,7 @@ func collectPattern(pattern ir.Node, value Value, bindings *[]patternBinding) er
 	case ir.Identifier:
 		*bindings = append(*bindings, patternBinding{pattern.Name, value})
 	case ir.ArrayPattern:
-		if value.Kind != ArrayKind {
+		if value.Kind != ArrayKind && value.Kind != TupleKind {
 			return runtimeError(diagnostic.ArgumentType, pattern, "array destructuring requires array, got %s", value.Kind)
 		}
 		for index, child := range pattern.Children {

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const stdOutputLimit = 8 << 20
@@ -21,10 +22,22 @@ func encodeJSON(args []Value) (Value, error) {
 		return Null(), err
 	}
 	b, err := json.Marshal(v)
+	if len(b) > stdOutputLimit {
+		return Null(), fmt.Errorf("JSON output exceeds 8 MiB")
+	}
 	return String(string(b)), err
 }
 
 func plainJSON(v Value, depth int) (interface{}, error) {
+	budget := stdOutputLimit
+	return boundedJSON(v, depth, &budget)
+}
+
+func boundedJSON(v Value, depth int, budget *int) (interface{}, error) {
+	*budget -= 16 + len(v.String)
+	if *budget < 0 {
+		return nil, fmt.Errorf("JSON value exceeds size budget")
+	}
 	if depth > 128 {
 		return nil, fmt.Errorf("cyclic value or nesting exceeds 128")
 	}
@@ -32,6 +45,9 @@ func plainJSON(v Value, depth int) (interface{}, error) {
 	case NullKind:
 		return nil, nil
 	case StringKind:
+		if !utf8.ValidString(v.String) {
+			return nil, fmt.Errorf("JSON string is not valid UTF-8")
+		}
 		return v.String, nil
 	case BooleanKind:
 		return v.Boolean, nil
@@ -39,10 +55,13 @@ func plainJSON(v Value, depth int) (interface{}, error) {
 		return v.Integer, nil
 	case FloatKind:
 		return v.Float, nil
-	case ArrayKind:
+	case ArrayKind, TupleKind:
+		if len(v.Array) > *budget/16 {
+			return nil, fmt.Errorf("JSON value exceeds size budget")
+		}
 		out := make([]interface{}, len(v.Array))
 		for j, item := range v.Array {
-			value, err := plainJSON(item, depth+1)
+			value, err := boundedJSON(item, depth+1, budget)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +71,11 @@ func plainJSON(v Value, depth int) (interface{}, error) {
 	case ObjectKind:
 		out := map[string]interface{}{}
 		for key, item := range v.Object {
-			value, err := plainJSON(item, depth+1)
+			if !utf8.ValidString(key) {
+				return nil, fmt.Errorf("JSON key is not valid UTF-8")
+			}
+			*budget -= len(key)
+			value, err := boundedJSON(item, depth+1, budget)
 			if err != nil {
 				return nil, err
 			}
@@ -65,6 +88,39 @@ func plainJSON(v Value, depth int) (interface{}, error) {
 }
 
 func decodeJSON(args []Value) (Value, error) {
+	if len(args[0].String) > stdOutputLimit {
+		return Null(), fmt.Errorf("JSON input exceeds 8 MiB")
+	}
+	if !utf8.ValidString(args[0].String) {
+		return Null(), fmt.Errorf("JSON input is not valid UTF-8")
+	}
+	// Preflight tokens before allocating a graph of BLBX values.
+	probe := json.NewDecoder(strings.NewReader(args[0].String))
+	probe.UseNumber()
+	depth, count := 0, 0
+	for {
+		token, err := probe.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return Null(), err
+		}
+		count++
+		if count > 100000 {
+			return Null(), fmt.Errorf("JSON exceeds 100000 tokens")
+		}
+		if delimiter, ok := token.(json.Delim); ok {
+			if delimiter == '[' || delimiter == '{' {
+				depth++
+			} else {
+				depth--
+			}
+			if depth > 128 {
+				return Null(), fmt.Errorf("JSON nesting exceeds 128")
+			}
+		}
+	}
 	decoder := json.NewDecoder(strings.NewReader(args[0].String))
 	decoder.UseNumber()
 	var value interface{}

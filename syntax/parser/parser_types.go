@@ -40,6 +40,7 @@ const (
 	BLOCK
 	FUNCTION_DECL
 	CLASS_DECL
+	INTERFACE_DECL
 
 	// control flow
 	IF_STATEMENT
@@ -48,6 +49,9 @@ const (
 )
 
 func (pt ParserType) String() string {
+	if pt == INTERFACE_DECL {
+		return "INTERFACE_DECL"
+	}
 	switch pt {
 	case ARRAY_PATTERN:
 		return "ARRAY_PATTERN"

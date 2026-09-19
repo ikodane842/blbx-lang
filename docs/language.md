@@ -1,6 +1,6 @@
 # BLBX language reference
 
-[Documentation index](README.md) · [Standard library](standard-library.md) · [Asynchronous tasks](async.md)
+[Documentation index](README.md) Â· [Standard library](standard-library.md) Â· [Asynchronous tasks](async.md)
 
 This reference describes the current `0.1.0-dev` interpreter. Examples use BLBX,
 regardless of the syntax coloring chosen by an editor. Save runnable examples as
@@ -116,9 +116,8 @@ Logical singleton methods require boolean receivers and evaluated arguments.
 ## Expressions and operators
 
 Calls, dot access, indexing, and method chains compose left to right.
-Parentheses group values and enable singleton-style spelling. Parenthesized
-comma lists evaluate as arrays; `()` is an empty array, and `(value)` is just
-that value. There is no distinct tuple runtime type.
+Parentheses group values and enable singleton-style spelling. Parenthesized comma lists create tuples: `(1, 2)`, `(1,)`, and `()`.
+`(value)` remains that value. Tuples have a distinct `tuple` type and reject indexed writes.
 
 | Operation | Syntax | Result |
 | --- | --- | --- |
@@ -133,11 +132,11 @@ that value. There is no distinct tuple runtime type.
 Only `*` is currently an infix arithmetic operator. Chained calls bind more
 tightly than `*`, which associates left to right. Use methods for other
 arithmetic; `+`, `-`, `/`, `%`, `==`, `&&`, and `||` are not source operators.
-Use numeric operands with `*`; its legacy implementation lacks the receiver
-validation of numeric methods. `=` assigns and `=>` introduces a function.
+Use numeric operands with `*`, or provide a left-hand multiplication overload. `=` assigns and `=>` introduces a function.
 
-Arrays, objects, functions, classes, and task handles have no deep or identity
-equality implementation; their `.eq()` currently returns false. Mixed-type
+Arrays, ordinary objects, functions, classes, and task handles have no built-in
+deep or identity equality; `.eq()` returns false unless an object overloads it.
+Tuples compare elements recursively using those equality rules. Mixed-type
 ordering returns false. Invalid numeric method operands return `null`.
 
 ```text
@@ -231,9 +230,9 @@ for([10, 20, 30], (cursor) => {
 })
 ```
 
-`for` currently supports arrays only, and returns the last callback result
-(or `null` for an empty array). Invalid iterable/callback combinations currently
-return `null`. Cursor control methods apply only to actual loop cursors.
+`for` accepts arrays, tuples, strings, and custom iterators. It returns the last
+callback result or null for empty iteration. Invalid iterable/callback values
+raise errors. See [iterators](features.md#iterator-protocol). Cursor control methods apply only to actual loop cursors.
 
 ### `while(condition_expression, body)`
 
@@ -301,11 +300,37 @@ errors. Object field values evaluate in order, with `self` available.
 brace block evaluates to `null`; braces are also used for statement bodies.
 A body containing only quoted-key fields evaluates as an object literal.
 
-Use dot assignment to add or change fields on an existing object. Indexed
-assignment is incomplete and must not be used to update arrays or objects.
-Bracket reads support integer array indices and string object keys. Out-of-range
+Use dot or bracket assignment to add or change fields on existing objects.
+Integer array assignment updates an existing slot; out-of-range writes raise
+BX4014. Strings and tuples reject writes. Bracket reads support integer array,
+tuple, and string indices, and string object keys. Out-of-range
 array reads, including negative indices, return `null`; missing object fields
-are errors. Direct string indexing is not implemented; use `.char_at(index)`.
+are errors. String bracket indices count Unicode code points and accept negative indices
+from the end, just like `.char_at(index)`.
+
+### self in plain objects
+
+Inside an object literal, `self` refers to the object being created. Fields
+evaluate in order, so an initializer can read fields already initialized.
+Inside a method, `self` refers to the object receiving the call.
+
+```text
+counter = {
+    "value": 0,
+    "increment": () => {
+        self.value = self.value.add(1)
+        return self.value
+    }
+}
+print(counter.increment()) // 1
+saved = counter.increment
+print(saved()) // 2; the extracted method retains its receiver
+```
+
+Dot and bracket method access both bind `self`. A nested object literal has its
+own `self`; capture the outer receiver in another variable if needed. `self`
+cannot be reassigned or used as a parameter, and using it without a receiver
+is an error. Class receivers are covered under [Classes and self](#classes-and-self).
 
 ## Imports and packages
 
@@ -414,15 +439,17 @@ return value is ignored. A class with no constructor accepts no arguments.
 Multiple constructors and executable statements directly in a class body are
 reported as errors.
 
-Single inheritance uses `class Child extends Parent { ... }`. The parent must
+Inheritance uses `class Child extends Parent { ... }` or multiple comma-separated
+bases, such as `class Child extends First, Second { ... }`. Each parent must
 already be a class; imported parents can use a dotted name such as `models.Base`.
-Fields initialize from base to child, and child declarations override inherited
-members. Mutable defaults remain separate per instance. Inherited methods keep
+Fields initialize once per ancestor in reverse C3 method resolution order,
+with higher-priority declarations overriding lower-priority ones. Mutable defaults remain separate per instance. Inherited methods keep
 their defining module's lexical scope, while `self` refers to the child instance.
 
 A child without a constructor inherits the nearest ancestor's constructor. A
 child with its own constructor replaces it; parent constructors are not called
-automatically. `super()` and multiple inheritance are not implemented.
+automatically. Use `super(arguments...)` for the next constructor and
+`super.method(arguments...)` for the next implementation in the instance MRO.
 
 ```text
 class Named {
@@ -435,6 +462,10 @@ class Token extends Named {
 print(Token("STRING").label()) // Token: STRING
 ```
 
+### self in classes
+
+For a class instance, `self` refers to that instance: use `self.field` to read
+or write its attributes and `self.method()` to call its methods.
 `self` refers to the receiver and is available inside constructors, methods,
 nested callbacks, and object-literal initializers. It cannot be reassigned or
 used as a parameter; accessing it without a receiver is an error.
@@ -493,7 +524,7 @@ behavior. Existing calls on variables and unparenthesized values remain supporte
 Use `typeof(value)`, the singleton property `value.typeof`, or the method
 `value.typeof()` to obtain a type
 name as a string. Both support `null`, `boolean`, `integer`, `float`, `string`,
-`array`, `object`, `function`, `class`, and `task`. Tuples currently evaluate to arrays.
+`array`, `tuple`, `object`, `function`, `class`, `interface`, `task`, and `resource`.
 
 ```text
 print(typeof(null))       // null
@@ -587,18 +618,20 @@ existing objects remain valid.
 Explicit `null` values are valid and distinct from undefined names. Failed
 conversions and out-of-range array reads still return `null`. Existing loop cursor
 accessors such as `.elem()` remain supported. Errors currently stop execution
-and make `blbx run` exit with code 1; catchable exceptions are not implemented.
+and make `blbx run` exit with code 1 unless caught using `try(work, handler)`.
+Use `throw(value)` for a user-defined failure. See [exceptions](features.md#exceptions).
 Both `check` and `run` check statically unresolved names, including names in
 uncalled functions. Dynamic member access and actual binding availability are
 checked at runtime. See [diagnostics](cli.md#current-checks-and-scope).
 
 
+See [additional language features](features.md) for interfaces, operator hooks,
+tuples, iterators, exceptions, and multiple-inheritance examples.
 ## Current limitations
 
-- No catchable exceptions, `try`/`catch`, or user-defined throw mechanism.
-- No immutable bindings, static types, interfaces, operator overloading, or separate tuple type.
-- No indexed assignment, string bracket indexing, or general iterator protocol.
-- No multiple inheritance or `super`.
+- Immutable bindings and static types remain intentionally omitted.
+- Interfaces validate method names and arity, not parameter/return types.
+- Exceptions use callbacks; there is no block-style try/catch or finally.
 - Function scoping, parameter validation, and numeric overflow handling remain incomplete.
 - No async/await keywords: use [std.task](async.md).
 - No formatter, debugger, package manager, or general REPL in the CLI.

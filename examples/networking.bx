@@ -1,0 +1,18 @@
+// Local HTTP demonstration; no external service is required.
+import std.networking as net
+import std.serialization as json
+
+server = net.serve("127.0.0.1:0", (request) => {
+    body = json.json_encode({"message": "Hello, BLBX", "path": request.path})
+    return {"status": 200, "headers": {"Content-Type": "application/json"}, "body": body}
+})
+result = try(
+    () => {
+        response = net.request("GET", "http://".concat(net.address(server), "/hello"), {"timeout_ms": 2000})
+        return json.json_decode(response.body).message
+    },
+    (error) => { return error.message }
+)
+net.close(server)
+net.wait(server)
+print(result)

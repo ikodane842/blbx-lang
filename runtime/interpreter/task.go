@@ -12,12 +12,13 @@ import (
 // Task publishes its immutable result by closing done. BLBX state never crosses
 // the worker boundary without a snapshot; only task handles are shared.
 type Task struct {
-	done    chan struct{}
-	result  Value
-	err     error
-	output  string
-	lines   []string
-	printed sync.Once
+	done        chan struct{}
+	result      Value
+	err         error
+	output      string
+	errorOutput string
+	lines       []string
+	printed     sync.Once
 }
 
 func taskModule() Value {
@@ -36,10 +37,13 @@ func taskModule() Value {
 			copied[n] = c.value(v)
 		}
 		worker := New()
+		worker.Args = append([]string(nil), i.Args...)
 		worker.global = c.scope(i.global)
 		worker.moduleRoot, worker.currentFile = i.moduleRoot, i.currentFile
 		worker.SetInput(strings.NewReader(""))
 		var output bytes.Buffer
+		var errorOutput bytes.Buffer
+		worker.ErrorWriter = &errorOutput
 		worker.SetOutput(&output)
 		task := &Task{done: make(chan struct{})}
 		go func() {
@@ -48,6 +52,7 @@ func taskModule() Value {
 					task.err = diagnostic.RuntimeCode(diagnostic.TaskFailure, fmt.Errorf("task failed: %v", recovered))
 				}
 				task.output, task.lines = output.String(), worker.Output
+				task.errorOutput = errorOutput.String()
 				close(task.done)
 			}()
 			result, err := worker.callFunction(fn.Function, copied)
@@ -74,7 +79,11 @@ func taskModule() Value {
 				}
 			}
 			<-task.done
-			task.printed.Do(func() { fmt.Fprint(i.Writer, task.output); i.Output = append(i.Output, task.lines...) })
+			task.printed.Do(func() {
+				fmt.Fprint(i.Writer, task.output)
+				fmt.Fprint(i.ErrorWriter, task.errorOutput)
+				i.Output = append(i.Output, task.lines...)
+			})
 			if task.err != nil {
 				return Null(), fmt.Errorf("std.task.await: %w", task.err)
 			}
@@ -91,6 +100,8 @@ type arrayIdentity struct {
 	length  int
 }
 type snapshot struct {
+	layers    map[uintptr]map[*Class]map[string]Value
+	supers    map[*superReference]*superReference
 	scopes    map[*Scope]*Scope
 	functions map[*Function]*Function
 	classes   map[*Class]*Class
@@ -99,7 +110,7 @@ type snapshot struct {
 }
 
 func newSnapshot() *snapshot {
-	return &snapshot{map[*Scope]*Scope{}, map[*Function]*Function{}, map[*Class]*Class{}, map[uintptr]map[string]Value{}, map[arrayIdentity][]Value{}}
+	return &snapshot{scopes: map[*Scope]*Scope{}, functions: map[*Function]*Function{}, classes: map[*Class]*Class{}, objects: map[uintptr]map[string]Value{}, arrays: map[arrayIdentity][]Value{}, layers: map[uintptr]map[*Class]map[string]Value{}, supers: map[*superReference]*superReference{}}
 }
 func (c *snapshot) scope(s *Scope) *Scope {
 	if s == nil {
@@ -126,9 +137,42 @@ func (c *snapshot) class(s *Class) *Class {
 	copy := *s
 	c.classes[s] = &copy
 	copy.Parent, copy.Env = c.class(s.Parent), c.scope(s.Env)
+	copy.Parents = nil
+	for _, p := range s.Parents {
+		copy.Parents = append(copy.Parents, c.class(p))
+	}
+	copy.MRO = nil
+	for _, p := range s.MRO {
+		copy.MRO = append(copy.MRO, c.class(p))
+	}
 	return &copy
 }
 func (c *snapshot) value(v Value) Value {
+	if v.Layers != nil {
+		key := reflect.ValueOf(v.Layers).Pointer()
+		if copy, ok := c.layers[key]; ok {
+			v.Layers = copy
+		} else {
+			original := v.Layers
+			v.Layers = map[*Class]map[string]Value{}
+			c.layers[key] = v.Layers
+			for class, fields := range original {
+				v.Layers[c.class(class)] = c.value(Object(fields)).Object
+			}
+		}
+	}
+	if v.Super != nil {
+		original := v.Super
+		if copy, ok := c.supers[original]; ok {
+			v.Super = copy
+		} else {
+			copy := &superReference{}
+			c.supers[original] = copy
+			v.Super = copy
+			copy.Owner = c.class(original.Owner)
+			copy.Receiver = c.value(original.Receiver)
+		}
+	}
 	if v.Object != nil {
 		key := reflect.ValueOf(v.Object).Pointer()
 		if copy, ok := c.objects[key]; ok {
@@ -164,6 +208,7 @@ func (c *snapshot) value(v Value) Value {
 			v.Function = &copy
 			c.functions[original] = &copy
 			copy.Env = c.scope(original.Env)
+			copy.Owner = c.class(original.Owner)
 			copy.Params = append([]Param(nil), original.Params...)
 			for n := range copy.Params {
 				copy.Params[n].Default = c.value(copy.Params[n].Default)

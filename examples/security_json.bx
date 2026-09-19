@@ -1,0 +1,12 @@
+import std.security as security
+import std.serialization as json
+
+value = json.json_decode("{\"language\":\"BLBX\",\"ready\":true}")
+print(json.json_pretty(value, 2))
+print(json.json_valid("not JSON"))
+print(security.md5("abc"))
+print(security.sha256("abc"))
+key = security.random_bytes(32)
+tag = security.hmac_sha256(key, "message")
+print(security.verify_hmac_sha256(key, "message", tag))
+print(security.utf8_decode(security.base64_decode(security.base64_encode("hello"))))

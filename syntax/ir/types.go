@@ -16,6 +16,7 @@ const (
 	Tuple         Type = "TUPLE"
 	Function      Type = "FUNCTION"
 	Class         Type = "CLASS"
+	Interface     Type = "INTERFACE"
 	Return        Type = "RETURN"
 	Assert        Type = "ASSERT"
 	Import        Type = "IMPORT"
@@ -30,11 +31,13 @@ const (
 )
 
 type Node struct {
-	Base     *Node  `json:"base,omitempty"`
-	Type     Type   `json:"type"`
-	Name     string `json:"name,omitempty"`
-	Value    string `json:"value,omitempty"`
-	DataType string `json:"dataType,omitempty"`
-	Line     int    `json:"line,omitempty"`
-	Children []Node `json:"children,omitempty"`
+	Bases      []Node `json:"bases,omitempty"`
+	Interfaces []Node `json:"interfaces,omitempty"`
+	Base       *Node  `json:"base,omitempty"`
+	Type       Type   `json:"type"`
+	Name       string `json:"name,omitempty"`
+	Value      string `json:"value,omitempty"`
+	DataType   string `json:"dataType,omitempty"`
+	Line       int    `json:"line,omitempty"`
+	Children   []Node `json:"children,omitempty"`
 }

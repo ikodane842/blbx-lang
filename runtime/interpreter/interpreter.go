@@ -49,6 +49,8 @@ type moduleEntry struct {
 }
 
 type Interpreter struct {
+	Args        []string
+	ErrorWriter io.Writer
 	global      *Scope
 	Output      []string
 	Input       *bufio.Reader
@@ -65,12 +67,13 @@ func New() *Interpreter {
 	}
 
 	return &Interpreter{
-		global:     NewScope(nil),
-		Output:     []string{},
-		Input:      bufio.NewReader(os.Stdin),
-		Writer:     os.Stdout,
-		moduleRoot: wd,
-		modules:    map[string]*moduleEntry{},
+		ErrorWriter: os.Stderr,
+		global:      NewScope(nil),
+		Output:      []string{},
+		Input:       bufio.NewReader(os.Stdin),
+		Writer:      os.Stdout,
+		moduleRoot:  wd,
+		modules:     map[string]*moduleEntry{},
 	}
 }
 
@@ -169,17 +172,13 @@ func (i *Interpreter) eval(node ir.Node, scope *Scope) (evalResult, error) {
 	case ir.Function:
 		return i.evalFunction(node, scope)
 	case ir.Class:
-		value := Value{Kind: ClassKind, Class: &Class{Name: node.Name, Body: node.Children, Env: scope}}
-		if node.Base != nil {
-			base, err := i.eval(*node.Base, scope)
-			if err != nil {
-				return base, err
-			}
-			if base.value.Kind != ClassKind || base.value.Class == nil {
-				return evalResult{}, runtimeError(diagnostic.InvalidBase, node, "base of class %s must be an existing class", node.Name)
-			}
-			value.Class.Parent = base.value.Class
+		return i.evalClass(node, scope)
+	case ir.Interface:
+		contract := &Interface{Name: node.Name, Methods: map[string]int{}}
+		for _, m := range node.Children {
+			contract.Methods[m.Name] = len(m.Children)
 		}
+		value := Value{Kind: InterfaceKind, Interface: contract}
 		scope.Define(node.Name, value)
 		return normal(value)
 	case ir.Return:
@@ -294,6 +293,10 @@ func (i *Interpreter) evalAssign(node ir.Node, scope *Scope) (evalResult, error)
 		scope.Set(target.Name, value.value)
 	case ir.Member:
 		if err := i.assignMember(target, value.value, scope); err != nil {
+			return value, err
+		}
+	case ir.Index:
+		if err := i.assignIndex(target, value.value, scope); err != nil {
 			return value, err
 		}
 	default:
@@ -574,7 +577,9 @@ func (i *Interpreter) evalArray(node ir.Node, scope *Scope) (evalResult, error) 
 }
 
 func (i *Interpreter) evalTuple(node ir.Node, scope *Scope) (evalResult, error) {
-	return i.evalArray(node, scope)
+	result, err := i.evalArray(node, scope)
+	result.value.Kind = TupleKind
+	return result, err
 }
 
 func (i *Interpreter) evalFunction(node ir.Node, scope *Scope) (evalResult, error) {
@@ -660,6 +665,24 @@ func (i *Interpreter) evalAssert(node ir.Node, scope *Scope) (evalResult, error)
 }
 
 func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
+	if node.Name == "super" && node.DataType == "direct-call" {
+		proxy, ok := scope.Get("super")
+		if !ok || proxy.Super == nil {
+			return evalResult{}, runtimeError(diagnostic.InvalidSelf, node, "super requires a class method")
+		}
+		args, result, err := i.evalArgs(node.Children, scope)
+		if err != nil || result.signal != noSignal {
+			return result, err
+		}
+		constructor, err := i.superMember(proxy.Super, "", node)
+		if err != nil {
+			return evalResult{}, err
+		}
+		return i.callValue(constructor, args)
+	}
+	if node.DataType == "direct-call" && (node.Name == "try" || node.Name == "throw") {
+		return i.exceptionCall(node, scope)
+	}
 	if node.DataType != "direct-call" && len(node.Children) > 0 && node.Children[0].Type == ir.Member {
 		return i.evalMethodCall(node, scope)
 	}
@@ -773,6 +796,24 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 	}
 
 	method := member.Children[1].Name
+	if hook, ok := operatorHooks[method]; ok && receiver.value.Kind == ObjectKind {
+		if _, exists := receiver.value.Object[method]; !exists {
+			if _, exists = receiver.value.Object[hook]; exists {
+				method = hook
+			}
+		}
+	}
+	if receiver.value.Super != nil {
+		fn, err := i.superMember(receiver.value.Super, method, node)
+		if err != nil {
+			return evalResult{}, err
+		}
+		args, result, err := i.evalArgs(node.Children[1:], scope)
+		if err != nil || result.signal != noSignal {
+			return result, err
+		}
+		return i.callValue(fn, args)
+	}
 	custom := false
 	if receiver.value.Kind == ObjectKind {
 		property, exists := receiver.value.Object[method]
@@ -1038,6 +1079,10 @@ func (i *Interpreter) evalMember(node ir.Node, scope *Scope) (evalResult, error)
 	}
 
 	property := node.Children[1].Name
+	if receiver.value.Super != nil {
+		v, err := i.superMember(receiver.value.Super, property, node)
+		return evalResult{value: v}, err
+	}
 	if (property == "indexes" || property == "values") && receiver.value.Kind == ObjectKind && receiver.value.Class == nil {
 		return normal(objectEntries(receiver.value, property))
 	}
@@ -1045,7 +1090,7 @@ func (i *Interpreter) evalMember(node ir.Node, scope *Scope) (evalResult, error)
 		return normal(String(receiver.value.TypeName()))
 	}
 	if property == "length" {
-		if receiver.value.Kind == ArrayKind || receiver.value.Kind == StringKind {
+		if receiver.value.Kind == ArrayKind || receiver.value.Kind == TupleKind || receiver.value.Kind == StringKind {
 			return normal(lengthOf(receiver.value))
 		}
 	}
@@ -1081,7 +1126,18 @@ func (i *Interpreter) evalIndex(node ir.Node, scope *Scope) (evalResult, error) 
 		return evalResult{}, runtimeError(diagnostic.MissingMember, node, "undefined member %q on object", index.value.String)
 	}
 
-	if target.value.Kind == ArrayKind && index.value.Kind == IntegerKind {
+	if target.value.Kind == StringKind && index.value.Kind == IntegerKind {
+		runes := []rune(target.value.String)
+		n := index.value.Integer
+		if n < 0 {
+			n += int64(len(runes))
+		}
+		if n < 0 || n >= int64(len(runes)) {
+			return normal(Null())
+		}
+		return normal(String(string(runes[n])))
+	}
+	if (target.value.Kind == ArrayKind || target.value.Kind == TupleKind) && index.value.Kind == IntegerKind {
 		arrayIndex := int(index.value.Integer)
 		if arrayIndex < 0 || arrayIndex >= len(target.value.Array) {
 			return normal(Null())
@@ -1109,6 +1165,15 @@ func (i *Interpreter) evalBinary(node ir.Node, scope *Scope) (evalResult, error)
 
 	switch node.Name {
 	case "*":
+		if method, ok := operatorMethod(left.value, "mul"); ok {
+			if method.Kind != FunctionKind {
+				return evalResult{}, runtimeError(diagnostic.NotCallable, node, "multiplication overload must be a function")
+			}
+			return i.callValue(bindReceiver(method, left.value), []Value{right.value})
+		}
+		if !isNumeric(left.value) || !isNumeric(right.value) {
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "multiplication requires numbers or a left-hand __mul__ overload")
+		}
 		if left.value.Kind == FloatKind || right.value.Kind == FloatKind {
 			return normal(Float(left.value.number() * right.value.number()))
 		}
@@ -1160,13 +1225,24 @@ func (i *Interpreter) evalFor(node ir.Node, scope *Scope) (evalResult, error) {
 		return callback, err
 	}
 
-	if iterable.value.Kind != ArrayKind || callback.value.Kind != FunctionKind {
-		return normal(Null())
+	if callback.value.Kind != FunctionKind {
+		return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "for callback must be a function")
+	}
+	next, err := i.iterator(iterable.value, node)
+	if err != nil {
+		return evalResult{}, err
 	}
 
 	last := Null()
 	step := int64(1)
-	for index, elem := range iterable.value.Array {
+	for index := 0; ; index++ {
+		elem, done, err := next()
+		if err != nil {
+			return evalResult{}, err
+		}
+		if done {
+			break
+		}
 		loopValue := Object(map[string]Value{
 			"elem": elem,
 			"idx":  Integer(int64(index)),
@@ -1251,7 +1327,7 @@ func runtimeError(code string, node ir.Node, format string, args ...interface{})
 
 func lengthOf(value Value) Value {
 	switch value.Kind {
-	case ArrayKind:
+	case ArrayKind, TupleKind:
 		return Integer(int64(len(value.Array)))
 	case StringKind:
 		return Integer(int64(len([]rune(value.String))))

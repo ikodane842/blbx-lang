@@ -1,6 +1,6 @@
 # BLBX standard library
 
-[Documentation index](README.md) � [Language](language.md) � [Async guide](async.md)
+[Documentation index](README.md) · [Language](language.md) · [Async guide](async.md)
 
 Native modules ship inside the BLBX executable. Importing them does not perform
 I/O. `check` validates import syntax without loading modules or executing calls.
@@ -19,7 +19,7 @@ files.write("data.json", json.json_encode(data))
 
 Except for the variadic `task.spawn`, arguments below are required, with
 exact arity. Bad types, failed I/O, and unsupported numeric domains raise runtime
-errors and stop execution. Documented absence cases, such as an unset environment
+errors and stop execution unless caught with `try`. Documented absence cases, such as an unset environment
 variable, may return `null`. Functions are
 ordinary callable values, so aliases and `from ... import ...` work.
 
@@ -40,6 +40,9 @@ These supplement singleton methods. Note that `std.strings.replace` replaces all
 matches, whereas the singleton `.replace()` replaces the first match.
 
 ## Files — `std.files`
+
+The additional byte, stat, copy, rename, remove, walk, and path APIs are listed in
+[the complete files/OS reference](system-library.md#files-and-paths--stdfiles).
 
 | Function | Result |
 | --- | --- |
@@ -79,7 +82,8 @@ Header keys are lowercase; each header value is an array of strings. HTTP error
 statuses such as 404 remain ordinary responses; transport failures are errors.
 Only HTTP/HTTPS URLs are supported. Requests follow the Go HTTP client's normal
 redirect behavior, time out after 15 seconds, and limit response bodies to 8 MiB.
-There is no server, socket, streaming, or custom-header API yet.
+Configurable requests, TCP/UDP, DNS, and an HTTP server are now available; see
+[the networking reference](system-library.md#http-client--stdnetworking).
 
 ## Collections — `std.collections`
 
@@ -102,16 +106,22 @@ singleton accessors; use `instance.method` to extract a bound method.
 
 ## Serialization — `std.serialization`
 
+Also available: `json_valid(text)`, `json_pretty(value, indent)`, `json_read(path)`,
+and `json_write(path, value)`. See [JSON helpers and limits](system-library.md#json--stdserialization).
+
 | Function | Result |
 | --- | --- |
 | `json_encode(value)` | Compact JSON string |
 | `json_decode(text)` | BLBX value |
 
-JSON supports null, booleans, strings, integers, floats, arrays, and objects.
+JSON supports null, booleans, strings, integers, floats, arrays, tuples, and objects.
+Tuples encode as JSON arrays and decode back as BLBX arrays.
 Integers preserve signed 64-bit precision. Out-of-range JSON integers, trailing
 content, malformed input, nonfinite floats, functions, task handles, and class definitions are
 errors. Cycles or nesting deeper than 128 levels are rejected. Class instances serialize their stored fields without preserving class identity. Objects containing
 methods cannot be serialized directly; construct a data-only object first.
+JSON input/output is limited to 8 MiB, decoding to 100,000 tokens, and encoding
+to an additional value-size budget. Input strings must be valid UTF-8.
 Exponent/decimal JSON numbers decode as floats. Other formats are not yet exposed.
 
 ## Math — `std.math`
@@ -170,8 +180,13 @@ return independent snapshots. Nested tasks and returning closures are supported.
 Worker output is buffered and emitted once, by the first await. Workers have
 empty standard input. Await every task you need before the main program exits;
 unawaited tasks do not keep the CLI alive. There is currently no cancellation,
-worker pool, or task timeout. Task failures stop execution when awaited, using
-the same error behavior as other runtime errors.
+worker pool, or task timeout. Task failures are raised when awaited and can be caught with `try`, like
+other runtime failures.
+
+## OS and security modules
+
+See [std.os](system-library.md#operating-system--stdos) and
+[std.security](system-library.md#security--stdsecurity) for every signature and limit.
 
 ## More examples
 
@@ -225,10 +240,11 @@ print(result.stdout)
 
 ## Scope of the library
 
-This reference lists all current exports. There are no regular-expression,
-random-number, socket/server, binary-stream, environment-setter, file-delete,
-or date-arithmetic APIs yet. There is no standard test framework or package
-manager. Use the supported signatures rather than assuming APIs from Python,
+The [system-library reference](system-library.md) documents expanded file, OS,
+JSON, network, and security exports. `std.os` supplies environment setters,
+script arguments, streams, and process execution. `std.security` supplies secure
+randomness, hashes, HMAC, and encoding utilities. Regular expressions, date
+arithmetic, a standard test framework, and a package manager remain unavailable. Use the supported signatures rather than assuming APIs from Python,
 JavaScript, or Go are present.
 
 For state isolation, output ordering, failures, polling, nested jobs, and batching,

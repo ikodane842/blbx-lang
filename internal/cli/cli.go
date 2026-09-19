@@ -20,7 +20,7 @@ const help = `BLBX — language tools
 Usage:
   blbx check [--format text|json] [--stdin-filename name.bx] <file.bx>...
   blbx check [--format text|json] --stdin-filename name.bx -
-  blbx run <file.bx>
+  blbx run <file.bx> [arguments...]
   blbx version
   blbx help
 
@@ -48,13 +48,15 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stdout, help)
 			return 0
 		}
-		if len(args) != 2 {
-			fmt.Fprintln(stderr, "usage: blbx run <file.bx>")
+		if len(args) < 2 {
+			fmt.Fprintln(stderr, "usage: blbx run <file.bx> [arguments...]")
 			return 2
 		}
 		runtime := interpreter.New()
 		runtime.SetInput(stdin)
 		runtime.SetOutput(stdout)
+		runtime.ErrorWriter = stderr
+		runtime.Args = append([]string(nil), args[2:]...)
 		if _, err := runtime.ExecuteFile(args[1]); err != nil {
 			fmt.Fprintln(stderr, err)
 			var pathError *os.PathError

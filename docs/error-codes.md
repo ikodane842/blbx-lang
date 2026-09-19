@@ -47,3 +47,10 @@ The authoritative registry is `syntax/diagnostic/codes.go`. BX4001 is reserved f
 | BX4106 | Math domain or result failure |
 | BX4107 | Process or environment operation failed |
 | BX4108 | Standard string operation failed |
+| BX3012 | Missing or incompatible interface method |
+| BX4014 | Indexed assignment out of range |
+| BX4015 | User-thrown value |
+| BX4016 | Invalid iterator protocol result |
+| BX4017 | Inconsistent multiple inheritance order |
+| BX4109 | Operating system operation failed |
+| BX4110 | Security or encoding operation failed |

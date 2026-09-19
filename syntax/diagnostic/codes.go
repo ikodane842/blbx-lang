@@ -2,6 +2,13 @@
 package diagnostic
 
 const (
+	OSFailure            = "BX4109"
+	SecurityFailure      = "BX4110"
+	IndexRange           = "BX4014"
+	UserThrown           = "BX4015"
+	IteratorProtocol     = "BX4016"
+	InterfaceMismatch    = "BX3012"
+	InheritanceOrder     = "BX4017"
 	SourceRead           = "BX0001"
 	UnknownCharacter     = "BX1001"
 	UnclosedString       = "BX1002"
@@ -48,6 +55,13 @@ const (
 // Codes returns a copy of the code-to-meaning registry.
 func Codes() map[string]string {
 	return map[string]string{
+		OSFailure:            "Operating system operation failed",
+		SecurityFailure:      "Security or encoding operation failed",
+		IndexRange:           "Indexed assignment out of range",
+		UserThrown:           "User-thrown value",
+		IteratorProtocol:     "Invalid iterator protocol result",
+		InterfaceMismatch:    "Missing or incompatible interface method",
+		InheritanceOrder:     "Inconsistent multiple inheritance order",
 		SourceRead:           "Source file read failure",
 		UnknownCharacter:     "Unknown source character",
 		UnclosedString:       "Unterminated string",

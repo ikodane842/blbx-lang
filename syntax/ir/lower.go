@@ -23,6 +23,12 @@ func Lower(nodes []parser.Node) Node {
 
 func lowerNode(node parser.Node) Node {
 	switch node.Type {
+	case parser.INTERFACE_DECL:
+		result := Node{Type: Interface, Name: node.Name, Line: node.Line}
+		for _, m := range node.Children {
+			result.Children = append(result.Children, Node{Name: m.Name, Line: m.Line, Children: lowerChildren(m, Function).Children})
+		}
+		return result
 	case parser.ARRAY_PATTERN:
 		return lowerChildren(node, ArrayPattern)
 	case parser.OBJECT_PATTERN:
@@ -59,6 +65,12 @@ func lowerNode(node parser.Node) Node {
 		return lowerFunction(node)
 	case parser.CLASS_DECL:
 		class := lowerChildren(node, Class)
+		for _, b := range node.Bases {
+			class.Bases = append(class.Bases, lowerNode(b))
+		}
+		for _, b := range node.Interfaces {
+			class.Interfaces = append(class.Interfaces, lowerNode(b))
+		}
 		if node.Base != nil {
 			base := lowerNode(*node.Base)
 			class.Base = &base

@@ -444,6 +444,7 @@ func (p *Parser) parseBlock() Node {
 func (p *Parser) parseParenExpression() Node {
 	tok := p.Consume()
 	items := []Node{}
+	hadComma := false
 
 	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_PAREN {
 		p.skipComments()
@@ -462,6 +463,9 @@ func (p *Parser) parseParenExpression() Node {
 		}
 
 		p.skipComments()
+		if p.Current().Type == lexer.COMMA {
+			hadComma = true
+		}
 		if !p.listSeparator(lexer.CLOSED_PAREN, "parenthesized items or parameters") {
 			break
 		}
@@ -469,7 +473,7 @@ func (p *Parser) parseParenExpression() Node {
 
 	p.Expect(lexer.CLOSED_PAREN)
 
-	if len(items) == 1 {
+	if len(items) == 1 && !hadComma {
 		return items[0]
 	}
 
@@ -623,6 +627,9 @@ func (p *Parser) parseAssignment(name Node) Node {
 
 func (p *Parser) parseStatement() Node {
 	p.skipComments()
+	if p.Current().Type == lexer.IDENTIFIER && p.Current().Name == "interface" && p.Peek(1).Type == lexer.IDENTIFIER {
+		return p.parseInterface()
+	}
 	if p.startsDestructuring() {
 		target := p.parsePattern(map[string]bool{})
 		assign := p.Current()
@@ -670,17 +677,14 @@ func (p *Parser) parseClass() Node {
 	tok := p.Consume()
 	name := p.Current()
 	p.Expect(lexer.IDENTIFIER)
-	var base *Node
+	bases := []Node{}
 	if p.match(lexer.EXTENDS) {
-		parent := p.Current()
-		p.Expect(lexer.IDENTIFIER)
-		value := NewToken(parent.Name, IDENTIFIER, parent.Line, nil)
-		for p.match(lexer.DOT) {
-			member := p.Current()
-			p.Expect(lexer.IDENTIFIER)
-			value = NewToken(member.Name, NAMESPACE, member.Line, []Node{value, NewToken(member.Name, IDENTIFIER, member.Line, nil)})
-		}
-		base = &value
+		bases = p.parseTypeNames()
+	}
+	interfaces := []Node{}
+	if p.Current().Type == lexer.IDENTIFIER && p.Current().Name == "implements" {
+		p.Consume()
+		interfaces = p.parseTypeNames()
 	}
 	if p.Current().Type != lexer.OPEN_BRACE {
 		p.fail(diagnostic.UnexpectedToken, "expected class body '{'")
@@ -698,7 +702,8 @@ func (p *Parser) parseClass() Node {
 		}
 	}
 	class := NewToken(name.Name, CLASS_DECL, tok.Line, body.Children)
-	class.Base = base
+	class.Bases = bases
+	class.Interfaces = interfaces
 	return class
 }
 
@@ -743,4 +748,53 @@ func (p *Parser) parseRecoveringStatement() (node Node) {
 		}
 	}()
 	return p.parseStatement()
+}
+
+func (p *Parser) parseTypeNames() []Node {
+	names := []Node{}
+	for {
+		name := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		value := NewToken(name.Name, IDENTIFIER, name.Line, nil)
+		for p.match(lexer.DOT) {
+			member := p.Current()
+			p.Expect(lexer.IDENTIFIER)
+			value = NewToken(member.Name, NAMESPACE, member.Line, []Node{value, NewToken(member.Name, IDENTIFIER, member.Line, nil)})
+		}
+		names = append(names, value)
+		if !p.match(lexer.COMMA) {
+			break
+		}
+	}
+	return names
+}
+func (p *Parser) parseInterface() Node {
+	tok := p.Consume()
+	name := p.Current()
+	p.Expect(lexer.IDENTIFIER)
+	p.Expect(lexer.OPEN_BRACE)
+	methods := []Node{}
+	seen := map[string]bool{}
+	for !p.AtEnd() && p.Current().Type != lexer.CLOSED_BRACE {
+		method := p.Current()
+		p.Expect(lexer.IDENTIFIER)
+		if seen[method.Name] {
+			p.fail(diagnostic.InterfaceMismatch, "duplicate interface method")
+		}
+		seen[method.Name] = true
+		p.Expect(lexer.OPEN_PAREN)
+		params := []Node{}
+		for !p.AtEnd() && p.Current().Type != lexer.CLOSED_PAREN {
+			param := p.Current()
+			p.Expect(lexer.IDENTIFIER)
+			params = append(params, NewToken(param.Name, IDENTIFIER, param.Line, nil))
+			if !p.listSeparator(lexer.CLOSED_PAREN, "interface parameters") {
+				break
+			}
+		}
+		p.Expect(lexer.CLOSED_PAREN)
+		methods = append(methods, NewToken(method.Name, FUNCTION_DECL, method.Line, params))
+	}
+	p.Expect(lexer.CLOSED_BRACE)
+	return NewToken(name.Name, INTERFACE_DECL, tok.Line, methods)
 }

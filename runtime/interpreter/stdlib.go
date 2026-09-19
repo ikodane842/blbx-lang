@@ -33,6 +33,7 @@ func standardModuleAt(moduleName, baseDir string) (Value, bool) {
 		"std.time": diagnostic.TimeFailure, "std.networking": diagnostic.NetworkFailure,
 		"std.collections": diagnostic.CollectionsFailure, "std.serialization": diagnostic.SerializationFailure,
 		"std.math": diagnostic.MathFailure, "std.processes": diagnostic.ProcessFailure,
+		"std.os": diagnostic.OSFailure, "std.security": diagnostic.SecurityFailure,
 	}[moduleName]
 	add := func(name string, kinds []Kind, fn func([]Value) (Value, error)) {
 		qualified := strings.TrimPrefix(moduleName, "std.") + "." + name
@@ -70,6 +71,7 @@ func standardModuleAt(moduleName, baseDir string) (Value, bool) {
 			return String(strings.ReplaceAll(a[0].String, a[1].String, a[2].String)), nil
 		})
 	case "std.files":
+		addFileUtilities(add, resolve)
 		add("read", []Kind{StringKind}, func(a []Value) (Value, error) { b, e := os.ReadFile(resolve(a[0].String)); return String(string(b)), e })
 		add("write", []Kind{StringKind, StringKind}, func(a []Value) (Value, error) {
 			return Null(), os.WriteFile(resolve(a[0].String), []byte(a[1].String), 0644)
@@ -172,11 +174,17 @@ func standardModuleAt(moduleName, baseDir string) (Value, bool) {
 		})
 		add("contains", []Kind{ArrayKind, ""}, func(a []Value) (Value, error) { v, _ := sequenceMethod(a[0], "contains", a[1:]); return v, nil })
 	case "std.serialization":
+		addJSONUtilities(add, resolve)
 		add("json_encode", []Kind{""}, encodeJSON)
 		add("json_decode", []Kind{StringKind}, decodeJSON)
 	case "std.networking":
+		addNetworking(add, exports)
 		add("get", []Kind{StringKind}, httpGet)
 		add("post", []Kind{StringKind, StringKind, StringKind}, httpPost)
+	case "std.security":
+		addSecurity(add)
+	case "std.os":
+		addOS(add, exports)
 	case "std.processes":
 		add("run", []Kind{StringKind, ArrayKind}, runProcess)
 		add("env", []Kind{StringKind}, func(a []Value) (Value, error) {

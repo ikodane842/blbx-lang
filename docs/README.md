@@ -5,7 +5,9 @@ These references describe the current interpreter and distinguish supported beha
 | Guide | Covers |
 | --- | --- |
 | [Language syntax](language.md) | Literals, variables, functions, control flow, objects, destructuring, classes, imports, and singleton methods |
+| [Additional language features](features.md) | Exceptions, interfaces, overloads, tuples, indexing, iterators, multiple inheritance, and super |
 | [Standard library](standard-library.md) | Every built-in module, function, result type, and operational limit |
+| [Files, OS, JSON, networking, security](system-library.md) | Complete new APIs, handles, timeouts, HTTP servers, and cryptographic primitives |
 | [Async and await usage](async.md) | Task creation, waiting, results, isolation, output, errors, and concurrency examples |
 | [CLI and diagnostics](cli.md) | Building, running, checking, JSON diagnostics, exit codes, and release builds |
 | [Error-code reference](error-codes.md) | All diagnostic codes and their meanings |

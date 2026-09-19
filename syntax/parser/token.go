@@ -1,8 +1,10 @@
 package parser
 
 type Node struct {
-	Base       *Node `json:"base,omitempty"`
-	DirectCall bool  `json:"directCall,omitempty"`
+	Bases      []Node `json:"bases,omitempty"`
+	Interfaces []Node `json:"interfaces,omitempty"`
+	Base       *Node  `json:"base,omitempty"`
+	DirectCall bool   `json:"directCall,omitempty"`
 	Name       string
 	Type       ParserType
 	Line       int
