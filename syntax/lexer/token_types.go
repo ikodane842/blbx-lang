@@ -35,10 +35,22 @@ const (
 	CLASS
 	SELF
 	EXTENDS
+	FSTRING_START
+	FSTRING_END
+	INTERPOLATION_START
+	INTERPOLATION_END
 )
 
 func (tt TokenType) String() string {
 	switch tt {
+	case FSTRING_START:
+		return "FSTRING_START"
+	case FSTRING_END:
+		return "FSTRING_END"
+	case INTERPOLATION_START:
+		return "INTERPOLATION_START"
+	case INTERPOLATION_END:
+		return "INTERPOLATION_END"
 	case EXTENDS:
 		return "EXTENDS"
 	case CLASS:

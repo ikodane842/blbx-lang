@@ -21,12 +21,12 @@ func collectPattern(pattern ir.Node, value Value, bindings *[]patternBinding) er
 		}
 		for index, child := range pattern.Children {
 			if child.Type == ir.RestPattern {
-				return collectPattern(child.Children[0], Array(append([]Value{}, value.Array[index:]...)), bindings)
+				return collectPattern(child.Children[0], Array(append([]Value{}, value.elements()[index:]...)), bindings)
 			}
-			if index >= len(value.Array) {
+			if index >= len(value.elements()) {
 				return runtimeError(diagnostic.DestructureMissing, child, "missing array element %d in destructuring", index)
 			}
-			if err := collectPattern(child, value.Array[index], bindings); err != nil {
+			if err := collectPattern(child, value.elements()[index], bindings); err != nil {
 				return err
 			}
 		}

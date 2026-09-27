@@ -26,10 +26,10 @@ func (i *Interpreter) assignIndex(node ir.Node, value Value, scope *Scope) error
 			return runtimeError(diagnostic.ArgumentType, node, "array index must be an integer")
 		}
 		n := index.value.Integer
-		if n < 0 || n >= int64(len(target.value.Array)) {
+		if n < 0 || n >= int64(len(target.value.elements())) {
 			return runtimeError(diagnostic.IndexRange, node, "array assignment index %d is out of range", n)
 		}
-		target.value.Array[n] = value
+		target.value.elements()[n] = value
 		return nil
 	default:
 		return runtimeError(diagnostic.InvalidReceiver, node, "indexed assignment is not available on %s", target.value.Kind)

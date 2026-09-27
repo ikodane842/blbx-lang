@@ -1,0 +1,59 @@
+verify = (condition) => {
+    if(condition.not(), () => { throw("while cursor verification failed") })
+}
+
+count = 0
+seen = []
+while(count.lt(10), (cursor) => {
+    verify(cursor.idx().eq(count))
+    verify(cursor.index().eq(count))
+    verify(cursor.step().eq(count.add(1)))
+    verify(cursor.elem().eq(null))
+    count = count.add(1)
+    if(count.eq(3), () => { cursor.continue() })
+    if(count.eq(6), () => { cursor.break() })
+    seen = seen.append(count)
+})
+verify(count.eq(6))
+verify(seen.join(",").eq("1,2,4,5"))
+
+// Continue reevaluates the condition; break does not.
+state = {"checks": 0, "visits": 0}
+condition = () => {
+    state.checks = state.checks.add(1)
+    return state.checks.lt(5)
+}
+while(condition(), (cursor) => {
+    state.visits = state.visits.add(1)
+    if(cursor.idx().eq(0), () => { cursor.continue() })
+    cursor.break()
+    throw("break must skip the rest of the callback")
+})
+verify(state.checks.eq(2))
+verify(state.visits.eq(2))
+
+// Existing callbacks, false conditions, and callback variables still work.
+legacy = 0
+while(legacy.lt(2), () => { legacy = legacy.add(1) })
+verify(legacy.eq(2))
+verify(while(false, (cursor) => { throw("must not run") }).eq(null))
+stop = (cursor) => { cursor.break() }
+while(true, stop)
+
+// Inner loop control must not end the outer loop.
+outer_count = 0
+inner_count = 0
+while(outer_count.lt(2), (outer) => {
+    outer_count = outer_count.add(1)
+    while(true, (inner) => {
+        inner_count = inner_count.add(1)
+        inner.break()
+    })
+})
+verify(outer_count.eq(2))
+verify(inner_count.eq(2))
+for([1, 2], (outer) => {
+    while(true, (inner) => { inner.break() })
+    verify(outer.elem().gte(1))
+})
+print("while cursor checks passed")

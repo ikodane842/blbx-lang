@@ -67,9 +67,29 @@ overflow.
 
 Strings support `\n`, `\r`, `\t`, `\b`, `\f`, `\"`, and `\\`. For an unknown
 escape, the backslash is dropped and the following character is retained.
-There is no interpolation or `\uXXXX` escape decoding; write Unicode directly.
-Actual line breaks may occur within a quoted string. String methods count
-Unicode code points rather than display graphemes.
+There is no `\uXXXX` escape decoding; write Unicode directly.
+
+Strings can span multiple source lines; line breaks and indentation are preserved.
+Prefix a string with `f` to interpolate expressions inside `{...}`:
+
+```text
+name = "Ada"
+print(f"Hello, {name}!")
+print(f"Move(
+    {name}
+)")
+```
+
+Interpolations accept ordinary BLBX expressions, including member access and
+method calls such as `{self.name}` and `{count.add(1)}`. Values use the same
+display text as `print` and are evaluated once, from left to right. Write `{{`
+and `}}` for literal braces. Empty or unclosed interpolations are errors.
+Ordinary strings without the `f` prefix do not interpolate. Format specifiers
+and conversion flags (such as Python's `:02d` and `!r`) are not supported.
+Interpolations can contain object literals, quoted strings, and nested formatted
+strings. Their names are checked by `blbx check` like names elsewhere in the file.
+See [formatted_strings.bx](../examples/formatted_strings.bx) for runnable examples.
+String methods count Unicode code points rather than display graphemes.
 
 ## Values and variables
 
@@ -96,7 +116,8 @@ across recursive calls; parameters are the reliable per-call bindings.
 
 Objects normally share their fields when passed or assigned. Updating an object's
 field through an alias affects the original object. Array transformation methods
-return new shallow arrays; nested objects remain shared. Task boundaries use
+return new shallow arrays except `extend`, which mutates the shared array;
+nested objects remain shared. Task boundaries use
 separate snapshots, as described in [async usage](async.md).
 
 ### Truthiness
@@ -127,6 +148,8 @@ Parentheses group values and enable singleton-style spelling. Parenthesized comm
 | Compare | `a.lt(b)`, `.lte(b)`, `.gt(b)`, `.gte(b)` | Boolean; numbers or two strings |
 | Equality | `a.eq(b)`, `a.neq(b)` | Scalar equality; integers/floats compare numerically |
 | Boolean operations | `a.and(b)`, `a.or(b)`, `a.not()` | Boolean; `and`/`or` short-circuit |
+| Bitwise operations | `a.bit_and(b)`, `a.bit_or(b)`, `a.bit_xor(b)`, `a.bit_not()` | Integer bit operations |
+| Bit shifts | `a.shl(count)`, `a.shr(count)`, `a.ushr(count)` | Integer; shift count 0–63 |
 | Infix multiply | `a * b` | Supported legacy arithmetic syntax |
 
 Only `*` is currently an infix arithmetic operator. Chained calls bind more
@@ -145,6 +168,51 @@ print((5).div(2))                 // 2.5
 print((2).lt(3).and((4).gt(1)))    // true
 print([].to_bool().not())         // true
 ```
+
+### Bitwise integer methods
+
+Bitwise methods operate on signed 64-bit integers. Receivers and operands must
+be integers; floats, booleans, strings, and arrays are not converted implicitly.
+These methods evaluate their arguments normally, without short-circuiting.
+
+| Method | Behavior |
+| --- | --- |
+| `a.bit_and(b)` | Set a result bit when both input bits are set |
+| `a.bit_or(b)` | Set a result bit when either input bit is set |
+| `a.bit_xor(b)` | Set a result bit when exactly one input bit is set |
+| `a.bit_not()` | Invert all 64 bits; two's-complement signed result |
+| `a.shl(count)` | Shift left, fill low bits with zeros, discard bits beyond 64 |
+| `a.shr(count)` | Arithmetic right shift; fill high bits with the sign bit |
+| `a.ushr(count)` | Logical right shift; fill high bits with zeros |
+
+All results remain signed integers. A zero shift leaves the value unchanged,
+including a negative value passed to `ushr(0)`. Left shifts can produce negative
+results when bit 63 is set. Shift counts below 0 or above 63 raise `runtime
+BX4018`; counts are not masked or clamped. Wrong receiver types use BX4002,
+wrong argument counts use BX4003, and non-integer arguments use BX4004.
+
+```text
+print((12).bit_and(10)) // 8
+print((12).bit_or(10))  // 14
+print((12).bit_xor(10)) // 6
+print((0).bit_not())   // -1
+print((1).shl(3))      // 8
+print((8).shr(2))      // 2
+negative = (0).sub(8)
+print(negative.shr(1))  // -4
+print(negative.ushr(1)) // 9223372036854775804
+
+// Set, check, and clear a flag.
+flag = (1).shl(3)
+flags = (0).bit_or(flag)
+print(flags.bit_and(flag).neq(0)) // true
+flags = flags.bit_and(flag.bit_not())
+print(flags) // 0
+```
+
+Use these methods for bitwise operations; `&`, `|`, `^`, `~`, `<<`, and `>>`
+are not source operators. `.and()`, `.or()`, and `.not()` remain boolean-only.
+Bitwise methods do not mutate their receiver; assign the result to retain it.
 
 ## Functions and closures
 
@@ -176,7 +244,9 @@ arguments for multi-parameter functions.
 `return value` exits the current function. Use `return null` for an explicit
 empty result; a bare `return` is not supported by the parser. Without `return`,
 a function evaluates to its body's last statement value, or `null` for an empty
-body. Returning inside a callback exits that callback, not the enclosing function.
+body. `if`, `for`, and `while` callbacks pass `return` outward to the enclosing
+ordinary function. At global scope, including inside these control-flow callbacks,
+`return value` stops the script. Other ordinary function calls remain return boundaries.
 
 Functions are first-class: pass them as arguments, store them in collections,
 and return them. Captured parameter bindings remain available after a call ends.
@@ -238,7 +308,8 @@ raise errors. See [iterators](features.md#iterator-protocol). Cursor control met
 
 The condition expression is reevaluated each iteration. Supply a boolean-producing
 expression or an explicit predicate call, not a bare predicate function: a
-function value itself is truthy. The body may be a zero-argument callback.
+function value itself is truthy. The body callback receives a cursor; existing
+zero-argument callbacks can ignore it.
 
 ```text
 counter = 0
@@ -248,10 +319,26 @@ while(counter.lt(3), () => {
 })
 ```
 
-`while` returns the last body result, or `null` if it never runs. There is no
-standalone `break`/`continue` keyword or while-specific cursor. Use the condition
-to terminate it. Control-call arity is not yet consistently validated; use the
-signatures shown here.
+Use `cursor.break()` to exit the loop and `cursor.continue()` to skip the rest
+of the current iteration and reevaluate the condition. These work inside nested
+`if` callbacks too:
+
+```text
+count = 0
+while(count.lt(10), (cursor) => {
+    count = count.add(1)
+    if(count.eq(3), () => { cursor.continue() })
+    if(count.eq(6), () => { cursor.break() })
+    print(count) // 1, 2, 4, 5
+})
+```
+
+The cursor provides zero-based `idx()` / `index()` and one-based `step()`
+iteration counts. `elem()` returns `null` because `while` has no iterable element.
+Counts advance after a continue. Loop control follows the same rules as `for`:
+the innermost executing loop handles a break or continue signal.
+`while` returns the last body result, or `null` if it never runs. Control-call
+arity is not yet consistently validated; use the signatures shown here.
 
 ### Recursion over nested arrays
 
@@ -269,11 +356,13 @@ recurse([1, [2, 3], [4, [5]]])
 
 ### `assert(value)`
 
-This is currently a truthy early-exit construct, not a conventional testing
-assertion. A truthy value stops the current evaluation sequence with that value;
-a falsey value returns `null` and continues. Function and branch boundaries
-consume this control signal. It does not throw an assertion error. Prefer
-explicit `if` and `return` for new code unless you need this existing behavior.
+`assert(value)` always exits the nearest executing `if`, `for`, or `while`
+statement and makes that statement evaluate to `value`, even for `false`, `0`,
+or `null`. `assert()` uses `null`. Execution resumes after that statement.
+Inside an `if` nested in a loop, it exits only the `if`; use the loop cursor
+to break or continue the loop. This is a control-flow operation, not a testing
+assertion, and does not throw an error. Without an enclosing control-flow
+statement, the signal ends the script.
 
 ### Console built-ins
 
@@ -282,7 +371,37 @@ explicit `if` and `return` for new code unless you need this existing behavior.
 and strips its line ending. `input()` has no prompt; EOF can return an empty
 string. `typeof(value)` returns the runtime type name and requires one argument.
 
+### `ord(character)`
+
+Returns the integer Unicode code point of a string containing exactly one
+code point. No import is required:
+
+```text
+print(ord("A"))  // 65
+print(ord("a"))  // 97
+print(ord("😀")) // 128512
+print(ord("c").sub(ord("a"))) // 2
+```
+
+Empty strings, strings containing multiple code points (including combined
+characters made from several code points), and non-string values raise BX4004.
+Missing or extra arguments raise BX4003. These errors can be caught with `try`.
+
 ## Objects and indexing
+
+Use `key.in(object)` to check whether a string key exists in an object:
+
+```text
+person = {"name": "Ada", "nickname": null}
+print(("name").in(person))     // true
+print(("nickname").in(person)) // true, even though its value is null
+print(("missing").in(person))  // false
+```
+
+This checks stored keys, including fields and methods on class instances.
+It does not search values or nested objects. Keys must be strings and the
+argument must be an object; invalid receivers raise BX4002, invalid arguments
+raise BX4004, and missing or extra arguments raise BX4003.
 
 ```text
 person = {"name": "Ada", "age": 36}
@@ -587,6 +706,7 @@ print(("-").join(["a", "b"]))                 // a-b
 | Array | `join(separator = "")` | Join the elements' display text |
 | Array | `concat(arrays...)` | Combine arrays, one level deep |
 | Array | `append(values...)` | Return an array with the values appended |
+| Array | `extend(other_array)` | Append the other array's elements in place; return `null` |
 | Array | `first()`, `last()` | Return the first/last element, or `null` for an empty array |
 | Both | `length`, `length()` | String code-point count or array element count |
 | Both | `is_empty()` | Test whether length is zero |
@@ -596,7 +716,19 @@ print(("-").join(["a", "b"]))                 // a-b
 | Both | `reverse()` | Return the reversed string/array |
 
 These methods do not modify their receiver. Assign the result to keep it:
-`items = items.append(3)`. Array copies are shallow; nested objects are shared.
+`items = items.append(3)`. `extend` is the exception: `items.extend([3, 4])`
+mutates the existing array, and aliases see the added elements. It takes exactly
+one array argument and returns `null`; do not assign its result back to `items`.
+Extending an array with itself duplicates its current elements once.
+
+```text
+items = [1, 2]
+alias = items
+items.extend([3, 4])
+print(alias) // [1, 2, 3, 4]
+```
+
+Array copies are shallow; nested objects are shared.
 Array searches use BLBX's existing equality rules (scalar value comparison,
 including numeric cross-type equality; no deep array/object comparison).
 
@@ -604,8 +736,9 @@ String indices and lengths count Unicode code points, not UTF-8 bytes or visual
 grapheme clusters. Negative `slice` and `char_at` indices count from the end;
 slice bounds are clamped, and a reversed range returns an empty result. Until
 negative number literals are supported, use `("-1").to_int()` for a negative
-index. Invalid argument types on sequence methods return `null`; invalid
-argument counts raise runtime errors.
+index. Invalid argument types on the sequence methods above return `null`, except
+`extend`, which raises BX4004 for a non-array argument. Invalid argument counts
+raise runtime errors. `extend` is available only on arrays, not tuples or strings.
 
 ## Undefined references
 

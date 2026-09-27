@@ -127,6 +127,7 @@ func (p *Parser) startsExpression() bool {
 		lexer.SELF,
 		lexer.IDENTIFIER,
 		lexer.STRING,
+		lexer.FSTRING_START,
 		lexer.INTEGER,
 		lexer.FLOAT,
 		lexer.OPEN_BRACKET,
@@ -502,6 +503,8 @@ func (p *Parser) parsePrimary() Node {
 		return p.parseIdentifier()
 	case lexer.STRING:
 		return p.parseString()
+	case lexer.FSTRING_START:
+		return p.parseFormattedString()
 	case lexer.INTEGER:
 		return p.parseInteger()
 	case lexer.FLOAT:

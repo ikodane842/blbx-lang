@@ -56,8 +56,8 @@ The additional byte, stat, copy, rename, remove, walk, and path APIs are listed 
 
 Relative paths resolve beside the `.bx` file that imports `std.files`, including
 when a function imported from that module is called later. Absolute paths are
-used unchanged. For example, `tests/main.bx` reading `"hello.txt"` reads
-`tests/hello.txt`, even when launched from the project root.
+used unchanged. For example, `app/main.bx` reading `"hello.txt"` reads
+`app/hello.txt`, even when launched from the project root.
 File functions read/write the whole string; streaming and binary buffers are
 not yet exposed. `write` and `append` do not create missing parent directories.
 
@@ -97,6 +97,8 @@ Configurable requests, TCP/UDP, DNS, and an HTTP server are now available; see
 
 Array singleton methods provide joining, slicing, concatenation, appending, and
 reversal. These transformations return new shallow arrays.
+`array.extend(other_array)` instead appends elements in place and returns `null`;
+all aliases observe the added elements.
 `length` takes one array, string, or object; `keys` and `values` take an object;
 `range` takes an integer; `contains` takes an array and any value.
 The module functions accept class instances as objects. This differs from the

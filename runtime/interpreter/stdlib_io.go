@@ -56,11 +56,11 @@ func boundedJSON(v Value, depth int, budget *int) (interface{}, error) {
 	case FloatKind:
 		return v.Float, nil
 	case ArrayKind, TupleKind:
-		if len(v.Array) > *budget/16 {
+		if len(v.elements()) > *budget/16 {
 			return nil, fmt.Errorf("JSON value exceeds size budget")
 		}
-		out := make([]interface{}, len(v.Array))
-		for j, item := range v.Array {
+		out := make([]interface{}, len(v.elements()))
+		for j, item := range v.elements() {
 			value, err := boundedJSON(item, depth+1, budget)
 			if err != nil {
 				return nil, err
@@ -234,7 +234,7 @@ func (b *limitedOutput) Write(p []byte) (int, error) {
 
 func runProcess(a []Value) (Value, error) {
 	args := []string{}
-	for _, value := range a[1].Array {
+	for _, value := range a[1].elements() {
 		if value.Kind != StringKind {
 			return Null(), fmt.Errorf("process arguments must be strings")
 		}

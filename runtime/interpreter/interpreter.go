@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type signal int
@@ -196,11 +197,11 @@ func (i *Interpreter) eval(node ir.Node, scope *Scope) (evalResult, error) {
 	case ir.Binary:
 		return i.evalBinary(node, scope)
 	case ir.If:
-		return i.evalIf(node, scope)
+		return finishControl(i.evalIf(node, scope))
 	case ir.For:
-		return i.evalFor(node, scope)
+		return finishControl(i.evalFor(node, scope))
 	case ir.While:
-		return i.evalWhile(node, scope)
+		return finishControl(i.evalWhile(node, scope))
 	default:
 		return normal(Null())
 	}
@@ -637,7 +638,7 @@ func (i *Interpreter) evalReturn(node ir.Node, scope *Scope) (evalResult, error)
 	}
 
 	value, err := i.eval(node.Children[0], scope)
-	if err != nil {
+	if err != nil || value.signal != noSignal {
 		return value, err
 	}
 	value.signal = returnSignal
@@ -646,7 +647,7 @@ func (i *Interpreter) evalReturn(node ir.Node, scope *Scope) (evalResult, error)
 
 func (i *Interpreter) evalAssert(node ir.Node, scope *Scope) (evalResult, error) {
 	if len(node.Children) == 0 {
-		return normal(Null())
+		return evalResult{value: Null(), signal: assertSignal}, nil
 	}
 
 	value, err := i.eval(node.Children[0], scope)
@@ -657,11 +658,7 @@ func (i *Interpreter) evalAssert(node ir.Node, scope *Scope) (evalResult, error)
 		return value, nil
 	}
 
-	if value.value.IsTruthy() {
-		return evalResult{value: value.value, signal: assertSignal}, nil
-	}
-
-	return normal(Null())
+	return evalResult{value: value.value, signal: assertSignal}, nil
 }
 
 func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
@@ -695,6 +692,34 @@ func (i *Interpreter) evalCall(node ir.Node, scope *Scope) (evalResult, error) {
 			return value, err
 		}
 		return normal(String(value.value.TypeName()))
+	}
+	if node.Name == "ord" && node.DataType == "direct-call" {
+		if len(node.Children) != 1 {
+			return evalResult{}, runtimeError(diagnostic.ArgumentCount, node, "ord expects exactly one argument")
+		}
+		value, err := i.eval(node.Children[0], scope)
+		if err != nil || value.signal != noSignal {
+			return value, err
+		}
+		if value.value.Kind != StringKind || !utf8.ValidString(value.value.String) || utf8.RuneCountInString(value.value.String) != 1 {
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "ord expects a string containing exactly one Unicode code point")
+		}
+		codePoint, _ := utf8.DecodeRuneInString(value.value.String)
+		return normal(Integer(int64(codePoint)))
+	}
+	if node.Name == "ord" && node.DataType == "direct-call" {
+		if len(node.Children) != 1 {
+			return evalResult{}, runtimeError(diagnostic.ArgumentCount, node, "ord expects exactly one argument")
+		}
+		value, err := i.eval(node.Children[0], scope)
+		if err != nil || value.signal != noSignal {
+			return value, err
+		}
+		if value.value.Kind != StringKind || !utf8.ValidString(value.value.String) || utf8.RuneCountInString(value.value.String) != 1 {
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "ord expects a string containing exactly one Unicode code point")
+		}
+		codePoint, _ := utf8.DecodeRuneInString(value.value.String)
+		return normal(Integer(int64(codePoint)))
 	}
 	if node.Name == "print" {
 		return i.evalPrint(node, scope)
@@ -862,6 +887,22 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 		return result, err
 	}
 
+	if method == "extend" && !custom {
+		if args[0].Kind != ArrayKind {
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "extend expects an array argument")
+		}
+		*receiver.value.array = append(receiver.value.elements(), args[0].elements()...)
+		return normal(Null())
+	}
+
+	if method == "in" && !custom {
+		if args[0].Kind != ObjectKind {
+			return evalResult{}, runtimeError(diagnostic.ArgumentType, node, "in expects an object argument")
+		}
+		_, exists := args[0].Object[receiver.value.String]
+		return normal(Boolean(exists))
+	}
+
 	if method == "continue" && !custom {
 		return evalResult{value: Null(), signal: continueSignal}, nil
 	}
@@ -882,6 +923,11 @@ func (i *Interpreter) evalMethodCall(node ir.Node, scope *Scope) (evalResult, er
 		}
 	}
 
+	if receiver.value.Kind == IntegerKind {
+		if value, handled, err := bitwiseMethod(receiver.value.Integer, method, args, node); handled {
+			return evalResult{value: value}, err
+		}
+	}
 	return normal(i.callMethod(receiver.value, method, args))
 }
 
@@ -903,6 +949,12 @@ func (i *Interpreter) evalArgs(nodes []ir.Node, scope *Scope) ([]Value, evalResu
 }
 
 func (i *Interpreter) callFunction(fn *Function, args []Value) (evalResult, error) {
+	return i.callFunctionBody(fn, args, false)
+}
+
+// Control-flow callbacks preserve return/assert signals for their enclosing
+// statement; ordinary calls remain function-return boundaries.
+func (i *Interpreter) callFunctionBody(fn *Function, args []Value, control bool) (evalResult, error) {
 	if fn == nil {
 		return normal(Null())
 	}
@@ -932,7 +984,7 @@ func (i *Interpreter) callFunction(fn *Function, args []Value) (evalResult, erro
 		return result, err
 	}
 
-	if result.signal == returnSignal || result.signal == assertSignal {
+	if !control && result.signal == returnSignal {
 		return normal(result.value)
 	}
 
@@ -1139,11 +1191,11 @@ func (i *Interpreter) evalIndex(node ir.Node, scope *Scope) (evalResult, error) 
 	}
 	if (target.value.Kind == ArrayKind || target.value.Kind == TupleKind) && index.value.Kind == IntegerKind {
 		arrayIndex := int(index.value.Integer)
-		if arrayIndex < 0 || arrayIndex >= len(target.value.Array) {
+		if arrayIndex < 0 || arrayIndex >= len(target.value.elements()) {
 			return normal(Null())
 		}
 
-		return normal(target.value.Array[arrayIndex])
+		return normal(target.value.elements()[arrayIndex])
 	}
 
 	return normal(Null())
@@ -1211,17 +1263,24 @@ func (i *Interpreter) evalIf(node ir.Node, scope *Scope) (evalResult, error) {
 	return result, err
 }
 
+func finishControl(result evalResult, err error) (evalResult, error) {
+	if err == nil && result.signal == assertSignal {
+		result.signal = noSignal
+	}
+	return result, err
+}
+
 func (i *Interpreter) evalFor(node ir.Node, scope *Scope) (evalResult, error) {
 	if len(node.Children) < 2 {
 		return normal(Null())
 	}
 
 	iterable, err := i.eval(node.Children[0], scope)
-	if err != nil {
+	if err != nil || iterable.signal != noSignal {
 		return iterable, err
 	}
 	callback, err := i.eval(node.Children[1], scope)
-	if err != nil {
+	if err != nil || callback.signal != noSignal {
 		return callback, err
 	}
 
@@ -1249,7 +1308,7 @@ func (i *Interpreter) evalFor(node ir.Node, scope *Scope) (evalResult, error) {
 			"step": Integer(step),
 		})
 		loopValue.Cursor = true
-		result, err := i.callFunction(callback.value.Function, []Value{loopValue})
+		result, err := i.callFunctionBody(callback.value.Function, []Value{loopValue}, true)
 		if err != nil {
 			return result, err
 		}
@@ -1261,7 +1320,10 @@ func (i *Interpreter) evalFor(node ir.Node, scope *Scope) (evalResult, error) {
 		if result.signal == breakSignal {
 			break
 		}
-		if result.signal == returnSignal || result.signal == assertSignal {
+		if result.signal == assertSignal {
+			return normal(result.value)
+		}
+		if result.signal == returnSignal {
 			return result, nil
 		}
 		step++
@@ -1276,16 +1338,22 @@ func (i *Interpreter) evalWhile(node ir.Node, scope *Scope) (evalResult, error) 
 	}
 
 	last := Null()
-	for {
+	for index := int64(0); ; index++ {
 		condition, err := i.eval(node.Children[0], scope)
-		if err != nil {
+		if err != nil || condition.signal != noSignal {
 			return condition, err
 		}
 		if !condition.value.IsTruthy() {
 			break
 		}
 
-		result, err := i.evalScopedValue(node.Children[1], scope)
+		cursor := Object(map[string]Value{
+			"elem": Null(),
+			"idx":  Integer(index),
+			"step": Integer(index + 1),
+		})
+		cursor.Cursor = true
+		result, err := i.evalScopedValue(node.Children[1], scope, cursor)
 		if err != nil {
 			return result, err
 		}
@@ -1296,7 +1364,10 @@ func (i *Interpreter) evalWhile(node ir.Node, scope *Scope) (evalResult, error) 
 		if result.signal == breakSignal {
 			break
 		}
-		if result.signal == returnSignal || result.signal == assertSignal {
+		if result.signal == assertSignal {
+			return normal(result.value)
+		}
+		if result.signal == returnSignal {
 			return result, nil
 		}
 	}
@@ -1304,18 +1375,14 @@ func (i *Interpreter) evalWhile(node ir.Node, scope *Scope) (evalResult, error) 
 	return normal(last)
 }
 
-func (i *Interpreter) evalScopedValue(node ir.Node, scope *Scope) (evalResult, error) {
+func (i *Interpreter) evalScopedValue(node ir.Node, scope *Scope, args ...Value) (evalResult, error) {
 	result, err := i.eval(node, scope)
-	if err != nil {
+	if err != nil || result.signal != noSignal {
 		return result, err
 	}
 
 	if result.value.Kind == FunctionKind {
-		return i.callFunction(result.value.Function, []Value{})
-	}
-
-	if result.signal == assertSignal {
-		return normal(result.value)
+		return i.callFunctionBody(result.value.Function, args, true)
 	}
 
 	return result, nil
@@ -1328,7 +1395,7 @@ func runtimeError(code string, node ir.Node, format string, args ...interface{})
 func lengthOf(value Value) Value {
 	switch value.Kind {
 	case ArrayKind, TupleKind:
-		return Integer(int64(len(value.Array)))
+		return Integer(int64(len(value.elements())))
 	case StringKind:
 		return Integer(int64(len([]rune(value.String))))
 	default:

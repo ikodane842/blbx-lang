@@ -24,6 +24,39 @@ arguments without the executable or file path.
 from stdin, and reports failures on stderr. Imports resolve using the interpreter's existing
 module rules, rooted at the entry file's directory.
 
+## Graph execution and inspection
+
+```powershell
+go build -o bin/blackbox.exe ./cmd/blackbox
+.\bin\blackbox.exe run examples/graph_execution.bx
+.\bin\blackbox.exe graph examples/graph_execution.bx > bin/graph.json
+```
+
+`blackbox run` executes through the graph backend, using the same syntax,
+checker, imports, library APIs, and script arguments as BLBX. Explicit calls
+still execute when their return values are unused. `blackbox check` uses the
+existing checker. Build `bin/blackbox` and use `./bin/blackbox` on macOS/Linux.
+
+The regular executable also offers `blbx run-graph file.bx [arguments...]` and
+`blbx graph file.bx`. Its existing `blbx run` command keeps the original runtime.
+
+`graph` checks the source and writes a JSON execution graph to stdout. It does
+not execute the script or load its imports. The graph contains node IDs, source
+locations, decoded static literal states, and named value/control/effect/reference
+edges. Imported modules build their own graphs when executed. IDs are local to
+each graph, not global runtime object IDs. Errors go to stderr, with the usual
+exit codes: 1 for source errors and 2 for usage, read, or output failures.
+
+Nodes now include `pure`, `valueType` (when known), and `effect` annotations.
+`VALUE_REF` nodes refer to completed scalar binding versions through `definition`
+edges; equivalent pure occurrences have a `shared-value` edge. Regions have an
+`exit` demand root whose `effect-in` dependencies determine statement or argument
+order. Forward `next` references are for navigation, not scheduling. For a small
+demonstration, inspect `blackbox graph examples/declarative_values.bx`.
+
+See [graph runtime architecture](graph-runtime-design.md) for classes, object
+identity, expression normalization, and current implementation limits.
+
 ## Windows installation and PATH setup
 
 If you have a prebuilt Windows release, extract it first and locate `blbx.exe`.

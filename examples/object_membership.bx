@@ -1,0 +1,42 @@
+verify = (condition) => {
+    if(condition.not(), () => { throw("object membership verification failed") })
+}
+object = {"name": "Ada", "empty": null, "disabled": false, "zero": 0, "": 1, "日本": 2}
+verify(("name").in(object))
+verify(("empty").in(object))
+verify(("disabled").in(object))
+verify(("zero").in(object))
+verify(("").in(object))
+verify(("日本").in(object))
+verify(("missing").in(object).not())
+verify(("Ada").in(object).not())
+verify(("name").in({"other": 1}).not())
+verify(("to_str").in(object).not())
+verify(("name").in(object).typeof().eq("boolean"))
+key = "name"
+verify((key).in(object))
+
+class Base {
+    field = null
+    method = () => { return 1 }
+}
+class Child extends Base {}
+instance = Child()
+verify(("field").in(instance))
+verify(("method").in(instance))
+verify(("missing").in(instance).not())
+custom = {"in": (target) => { return target }}
+verify(custom.in(true))
+
+expect_error = (work, code) => {
+    actual = try(work, (error) => { return error.code })
+    verify(actual.eq(code))
+}
+expect_error(() => { return (1).in(object) }, "BX4002")
+expect_error(() => { return ("name").in([]) }, "BX4004")
+expect_error(() => { return ("name").in(null) }, "BX4004")
+expect_error(() => { return ("name").in("name") }, "BX4004")
+expect_error(() => { return ("name").in() }, "BX4003")
+expect_error(() => { return ("name").in(object, object) }, "BX4003")
+expect_error(() => { return ("name").in(throw("failed")) }, "BX4015")
+print("object membership checks passed")

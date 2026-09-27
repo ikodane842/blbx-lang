@@ -26,7 +26,7 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 			if receiver.Kind == StringKind {
 				return Boolean(receiver.String == ""), true
 			}
-			return Boolean(len(receiver.Array) == 0), true
+			return Boolean(len(receiver.elements()) == 0), true
 		}
 	case "slice":
 		if receiver.Kind == StringKind {
@@ -36,9 +36,9 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 				return String(string(runes[start:end])), true
 			}
 		} else {
-			start, end, ok := sliceBounds(len(receiver.Array), args)
+			start, end, ok := sliceBounds(len(receiver.elements()), args)
 			if ok {
-				return Array(append([]Value{}, receiver.Array[start:end]...)), true
+				return Array(append([]Value{}, receiver.elements()[start:end]...)), true
 			}
 		}
 	case "reverse":
@@ -50,7 +50,7 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 				}
 				return String(string(runes)), true
 			}
-			values := append([]Value{}, receiver.Array...)
+			values := append([]Value{}, receiver.elements()...)
 			for left, right := 0, len(values)-1; left < right; left, right = left+1, right-1 {
 				values[left], values[right] = values[right], values[left]
 			}
@@ -68,7 +68,7 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 					index = utf8.RuneCountInString(receiver.String[:byteIndex])
 				}
 			} else {
-				for n, value := range receiver.Array {
+				for n, value := range receiver.elements() {
 					if value.Equal(args[0]) {
 						index = n
 						break
@@ -89,12 +89,12 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 			}
 			return String(result.String()), true
 		}
-		values := append([]Value{}, receiver.Array...)
+		values := append([]Value{}, receiver.elements()...)
 		for _, value := range args {
 			if value.Kind != ArrayKind {
 				return Null(), true
 			}
-			values = append(values, value.Array...)
+			values = append(values, value.elements()...)
 		}
 		return Array(values), true
 	case "join":
@@ -109,16 +109,16 @@ func sequenceMethod(receiver Value, method string, args []Value) (Value, bool) {
 				}
 				separator = args[0].String
 			}
-			return joinValues(receiver.Array, separator), true
+			return joinValues(receiver.elements(), separator), true
 		}
 		if len(args) == 1 && args[0].Kind == ArrayKind {
-			return joinValues(args[0].Array, receiver.String), true
+			return joinValues(args[0].elements(), receiver.String), true
 		}
 	default:
 		if receiver.Kind == StringKind {
 			return stringMethod(receiver.String, method, args)
 		}
-		return arrayMethod(receiver.Array, method, args)
+		return arrayMethod(receiver.elements(), method, args)
 	}
 	return Null(), true
 }

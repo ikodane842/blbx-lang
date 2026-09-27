@@ -52,5 +52,11 @@ The authoritative registry is `syntax/diagnostic/codes.go`. BX4001 is reserved f
 | BX4015 | User-thrown value |
 | BX4016 | Invalid iterator protocol result |
 | BX4017 | Inconsistent multiple inheritance order |
+| BX4018 | Bitwise shift count outside 0 through 63 |
 | BX4109 | Operating system operation failed |
 | BX4110 | Security or encoding operation failed |
+
+Formatted strings reuse existing syntax codes: BX1002 covers an unterminated
+formatted string or interpolation, BX2001 covers an unescaped literal `}`,
+and BX2004 covers excessive formatted-string nesting. Invalid expressions
+inside `{...}` use the ordinary parser diagnostics; undefined names use BX3001.

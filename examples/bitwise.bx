@@ -1,0 +1,14 @@
+print((12).bit_and(10)) // 8
+print((12).bit_or(10)) // 14
+print((12).bit_xor(10)) // 6
+print((0).bit_not()) // -1
+print((1).shl(3)) // 8
+negative = (0).sub(8)
+print(negative.shr(1)) // -4
+print(negative.ushr(1)) // 9223372036854775804
+
+flag = (1).shl(3)
+flags = (0).bit_or(flag)
+print(flags.bit_and(flag).neq(0)) // true
+flags = flags.bit_and(flag.bit_not())
+print(flags) // 0

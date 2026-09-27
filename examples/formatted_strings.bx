@@ -1,0 +1,39 @@
+verify = (condition) => {
+    if(condition.not(), () => { throw("formatted string verification failed") })
+}
+
+name = "Ada"
+count = 3
+verify(f"Hello, {name}!".eq("Hello, Ada!"))
+verify(f"{count} moves; next: {count.add(1)}".eq("3 moves; next: 4"))
+verify(f"{{{name}}}".eq("{Ada}"))
+verify(f"{true}, {null}, {[1, 2]}".eq("true, null, [1, 2]"))
+verify(f"".eq(""))
+verify(f"plain\ntext".eq("plain\ntext"))
+verify("{name}".eq("{name}"))
+verify(f"{"quoted"}".eq("quoted"))
+verify(f"{f"nested {name}"}".eq("nested Ada"))
+verify(f"{{}}".eq("{}"))
+verify(f"{ {"value": 7}.value }".eq("7"))
+
+state = {"count": 0}
+next = () => {
+    state.count = state.count.add(1)
+    return state.count
+}
+verify(f"{next()} {next()}".eq("1 2"))
+verify(state.count.eq(2))
+
+class Move {
+    (name) => { self.name = name }
+    __repr__ = () => { return f"Move({self.name})" }
+}
+verify(Move("pawn").__repr__().eq("Move(pawn)"))
+
+__repr__ = () => {
+    return f"Move(
+    {name}
+)"
+}
+verify(__repr__().eq("Move(\n    Ada\n)"))
+print(__repr__())

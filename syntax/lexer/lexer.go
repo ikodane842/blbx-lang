@@ -29,6 +29,7 @@ type Lexer struct {
 	start       int
 	lines       []int
 	columns     []int
+	formatDepth int
 }
 
 func (l *Lexer) Set(s string) {
@@ -248,11 +249,28 @@ func (l *Lexer) readMultiLineComment(line *int) {
 }
 
 func (l *Lexer) Tokenize() {
+	l.tokenize(false)
+	l.start = l.Pos
+	l.AddToken("", EOF, l.lines[l.Pos])
+}
+
+// tokenize also scans interpolation expressions, stopping at their closing brace.
+func (l *Lexer) tokenize(interpolation bool) {
 	line := 1
+	braces := 0
 
 	for !l.AtEnd() {
 		l.start = l.Pos
 		ch := l.Current()
+		if interpolation && ch == '}' && braces == 0 {
+			l.Consume()
+			l.AddToken("}", INTERPOLATION_END, line)
+			return
+		}
+		if ch == 'f' && l.Peek() == '"' {
+			l.readFormattedString()
+			continue
+		}
 
 		// handle whitespace
 		if ch == ' ' || ch == '\t' || ch == '\r' || (l.Pos == 0 && ch == '\uFEFF') {
@@ -351,6 +369,7 @@ func (l *Lexer) Tokenize() {
 
 		// handle opened brace
 		if l.Current() == '{' {
+			braces++
 			l.Consume()
 			l.AddToken("{", OPEN_BRACE, line)
 			continue
@@ -358,6 +377,7 @@ func (l *Lexer) Tokenize() {
 
 		// handle closed brace
 		if l.Current() == '}' {
+			braces--
 			l.Consume()
 			l.AddToken("}", CLOSED_BRACE, line)
 			continue
@@ -390,6 +410,8 @@ func (l *Lexer) Tokenize() {
 		l.Consume()
 		l.report(diagnostic.UnknownCharacter, fmt.Sprintf("unexpected character %q", ch))
 	}
-	l.start = l.Pos
-	l.AddToken("", EOF, l.lines[l.Pos])
+	if interpolation {
+		l.start = l.Pos
+		l.report(diagnostic.UnclosedString, "unterminated interpolation; expected closing brace")
+	}
 }

@@ -1,0 +1,26 @@
+{
+  "name": "blbx-language",
+  "displayName": "BLBX",
+  "description": "Syntax highlighting and editing support for the BLBX language.",
+  "version": "0.1.0",
+  "publisher": "JoshuaWhitfield",
+  "license": "GPL-3.0-only",
+  "repository": { "type": "git", "url": "https://github.com/ikodane842/blbx-lang.git", "directory": "editors/vscode" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "keywords": ["blbx", "bx", "syntax highlighting"],
+  "scripts": { "package": "npx --yes @vscode/vsce package --allow-missing-repository" },
+  "contributes": {
+    "languages": [{
+      "id": "blbx",
+      "aliases": ["BLBX", "blbx"],
+      "extensions": [".bx"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "blbx",
+      "scopeName": "source.blbx",
+      "path": "./syntaxes/blbx.tmLanguage.json"
+    }]
+  }
+}

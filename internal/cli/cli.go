@@ -2,9 +2,12 @@
 package cli
 
 import (
+	"blbx_lang/runtime/graph"
+	"blbx_lang/runtime/graphvm"
 	"blbx_lang/runtime/interpreter"
 	"blbx_lang/syntax/check"
 	"blbx_lang/syntax/diagnostic"
+	"blbx_lang/syntax/ir"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -21,10 +24,13 @@ Usage:
   blbx check [--format text|json] [--stdin-filename name.bx] <file.bx>...
   blbx check [--format text|json] --stdin-filename name.bx -
   blbx run <file.bx> [arguments...]
+  blbx run-graph <file.bx> [arguments...]
+  blbx graph <file.bx>
   blbx version
   blbx help
 
 check validates syntax and undefined names without executing code or resolving imports.
+run-graph executes the same syntax using the graph backend; graph emits its JSON graph.
 Use - to read source from stdin. Options must precede file paths.
 Exit codes: 0 success, 1 source/runtime errors, 2 usage or I/O errors.
 `
@@ -43,21 +49,34 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	case "check":
 		return runCheck(args[1:], stdin, stdout, stderr)
-	case "run":
+	case "graph":
+		return dumpGraph(args[1:], stdout, stderr)
+	case "run", "run-graph":
 		if len(args) == 2 && (args[1] == "--help" || args[1] == "-h") {
 			fmt.Fprint(stdout, help)
 			return 0
 		}
 		if len(args) < 2 {
-			fmt.Fprintln(stderr, "usage: blbx run <file.bx> [arguments...]")
+			fmt.Fprintf(stderr, "usage: blbx %s <file.bx> [arguments...]\n", args[0])
 			return 2
 		}
-		runtime := interpreter.New()
-		runtime.SetInput(stdin)
-		runtime.SetOutput(stdout)
-		runtime.ErrorWriter = stderr
-		runtime.Args = append([]string(nil), args[2:]...)
-		if _, err := runtime.ExecuteFile(args[1]); err != nil {
+		var err error
+		if args[0] == "run-graph" {
+			runtime := graphvm.New()
+			runtime.SetInput(stdin)
+			runtime.SetOutput(stdout)
+			runtime.ErrorWriter = stderr
+			runtime.Args = append([]string(nil), args[2:]...)
+			_, err = runtime.ExecuteFile(args[1])
+		} else {
+			runtime := interpreter.New()
+			runtime.SetInput(stdin)
+			runtime.SetOutput(stdout)
+			runtime.ErrorWriter = stderr
+			runtime.Args = append([]string(nil), args[2:]...)
+			_, err = runtime.ExecuteFile(args[1])
+		}
+		if err != nil {
 			fmt.Fprintln(stderr, err)
 			var pathError *os.PathError
 			if errors.As(err, &pathError) {
@@ -70,6 +89,34 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unknown command %q; use blbx help\n", args[0])
 		return 2
 	}
+}
+
+func dumpGraph(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: blbx graph <file.bx>")
+		return 2
+	}
+	if args[0] == "--help" || args[0] == "-h" {
+		fmt.Fprintln(stdout, "usage: blbx graph <file.bx>\nEmit a JSON execution graph without executing code or resolving imports.")
+		return 0
+	}
+	source, err := os.ReadFile(args[0])
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	nodes, diagnostics := check.Source(args[0], string(source))
+	if len(diagnostics) != 0 {
+		for _, d := range diagnostics {
+			fmt.Fprintln(stderr, d.Error())
+		}
+		return 1
+	}
+	if err := graph.Build(ir.Lower(nodes), args[0]).WriteJSON(stdout); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	return 0
 }
 
 func runCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

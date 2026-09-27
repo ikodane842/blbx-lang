@@ -95,10 +95,6 @@ func taskModule() Value {
 
 // Memoizing every mutable graph node preserves cycles and aliases, including
 // recursive functions, self references, and arrays containing their owner.
-type arrayIdentity struct {
-	pointer uintptr
-	length  int
-}
 type snapshot struct {
 	layers    map[uintptr]map[*Class]map[string]Value
 	supers    map[*superReference]*superReference
@@ -106,11 +102,11 @@ type snapshot struct {
 	functions map[*Function]*Function
 	classes   map[*Class]*Class
 	objects   map[uintptr]map[string]Value
-	arrays    map[arrayIdentity][]Value
+	arrays    map[*[]Value]*[]Value
 }
 
 func newSnapshot() *snapshot {
-	return &snapshot{scopes: map[*Scope]*Scope{}, functions: map[*Function]*Function{}, classes: map[*Class]*Class{}, objects: map[uintptr]map[string]Value{}, arrays: map[arrayIdentity][]Value{}, layers: map[uintptr]map[*Class]map[string]Value{}, supers: map[*superReference]*superReference{}}
+	return &snapshot{scopes: map[*Scope]*Scope{}, functions: map[*Function]*Function{}, classes: map[*Class]*Class{}, objects: map[uintptr]map[string]Value{}, arrays: map[*[]Value]*[]Value{}, layers: map[uintptr]map[*Class]map[string]Value{}, supers: map[*superReference]*superReference{}}
 }
 func (c *snapshot) scope(s *Scope) *Scope {
 	if s == nil {
@@ -186,16 +182,17 @@ func (c *snapshot) value(v Value) Value {
 			}
 		}
 	}
-	if v.Array != nil {
-		key := arrayIdentity{reflect.ValueOf(v.Array).Pointer(), len(v.Array)}
+	if v.array != nil {
+		key := v.array
 		if copy, ok := c.arrays[key]; ok {
-			v.Array = copy
+			v.array = copy
 		} else {
-			original := v.Array
-			v.Array = make([]Value, len(original))
-			c.arrays[key] = v.Array
+			original := v.elements()
+			copy := make([]Value, len(original))
+			v.array = &copy
+			c.arrays[key] = v.array
 			for n, item := range original {
-				v.Array[n] = c.value(item)
+				copy[n] = c.value(item)
 			}
 		}
 	}

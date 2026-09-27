@@ -1,0 +1,43 @@
+verify = (condition) => {
+    if(condition.not(), () => { throw("control flow verification failed") })
+}
+verify(if(true, () => { assert(false)
+    throw("unreachable") }).eq(false))
+verify(if(true, () => { assert(0)
+    throw("unreachable") }).eq(0))
+verify(if(true, () => { assert(null)
+    throw("unreachable") }).eq(null))
+verify(if(true, () => { assert()
+    throw("unreachable") }).eq(null))
+state = {"visits": 0}
+value = for([1, 2, 3], (cursor) => {
+    state.visits = state.visits.add(1)
+    assert(0)
+    throw("unreachable")
+})
+verify(value.eq(0))
+verify(state.visits.eq(1))
+verify(while(true, (cursor) => { assert(false) }).eq(false))
+while(state.visits.lt(3), (cursor) => {
+    if(true, () => { assert(null) })
+    state.visits = state.visits.add(1)
+})
+verify(state.visits.eq(3))
+find = () => {
+    for([1, 2, 3], (cursor) => {
+        while(true, (inner) => {
+            if(cursor.elem().eq(2), () => { return 42 })
+            inner.break()
+        })
+    })
+    throw("return did not reach enclosing function")
+}
+verify(find().eq(42))
+ordinary = () => { return 7 }
+verify(if(true, () => { ordinary()
+    assert(9) }).eq(9))
+print("control flow return checks passed")
+if(true, () => {
+    while(true, (cursor) => { return null })
+})
+throw("global return did not stop script")

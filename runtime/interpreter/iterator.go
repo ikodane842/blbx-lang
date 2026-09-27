@@ -18,10 +18,10 @@ func (i *Interpreter) iterator(value Value, node ir.Node) (func() (Value, bool, 
 	if value.Kind == ArrayKind || value.Kind == TupleKind {
 		index := 0
 		return func() (Value, bool, error) {
-			if index >= len(value.Array) {
+			if index >= len(value.elements()) {
 				return Null(), true, nil
 			}
-			item := value.Array[index]
+			item := value.elements()[index]
 			index++
 			return item, false, nil
 		}, nil

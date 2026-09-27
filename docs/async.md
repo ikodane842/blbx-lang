@@ -63,6 +63,12 @@ including recursive functions, closures, and class instances. Existing task
 handles are shared completion handles rather than copied workers. Network
 resources are also shared external handles; closing one affects every holder.
 
+This isolation also applies to `array.extend()`: extending a worker's array
+updates aliases inside that worker, including aliases of initially empty arrays,
+but does not change the caller's array. Extending an awaited result does not
+change the stored task result or later await snapshots. See
+[array_extend.bx](../examples/array_extend.bx) for executable checks.
+
 ```text
 import std.task as task
 state = {"count": 1}

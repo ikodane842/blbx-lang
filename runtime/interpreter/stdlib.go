@@ -66,7 +66,7 @@ func standardModuleAt(moduleName, baseDir string) (Value, bool) {
 			m := method
 			add(m, []Kind{StringKind, StringKind}, func(a []Value) (Value, error) { v, _ := sequenceMethod(a[0], m, a[1:]); return v, nil })
 		}
-		add("join", []Kind{ArrayKind, StringKind}, func(a []Value) (Value, error) { return joinValues(a[0].Array, a[1].String), nil })
+		add("join", []Kind{ArrayKind, StringKind}, func(a []Value) (Value, error) { return joinValues(a[0].elements(), a[1].String), nil })
 		add("replace", []Kind{StringKind, StringKind, StringKind}, func(a []Value) (Value, error) {
 			return String(strings.ReplaceAll(a[0].String, a[1].String, a[2].String)), nil
 		})

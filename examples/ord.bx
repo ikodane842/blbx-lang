@@ -1,0 +1,37 @@
+verify = (condition) => {
+    if(condition.not(), () => { throw("ord verification failed") })
+}
+
+verify(ord("A").eq(65))
+verify(ord("a").eq(97))
+verify(ord("0").eq(48))
+verify(ord("é").eq(233))
+verify(ord("中").eq(20013))
+verify(ord("😀").eq(128512))
+verify(ord("�").eq(65533))
+verify(ord("\n").eq(10))
+verify(ord("c").sub(ord("a")).eq(2))
+verify(ord("A").typeof().eq("integer"))
+
+expect_error = (work, code) => {
+    actual = try(work, (error) => { return error.code })
+    verify(actual.eq(code))
+}
+expect_error(() => { return ord() }, "BX4003")
+expect_error(() => { return ord("a", "b") }, "BX4003")
+expect_error(() => { return ord(65) }, "BX4004")
+expect_error(() => { return ord(null) }, "BX4004")
+expect_error(() => { return ord(["a"]) }, "BX4004")
+expect_error(() => { return ord("") }, "BX4004")
+expect_error(() => { return ord("ab") }, "BX4004")
+expect_error(() => { return ord("é") }, "BX4004")
+expect_error(() => { return ord(throw("argument failed")) }, "BX4015")
+
+state = {"calls": 0}
+character = () => {
+    state.calls = state.calls.add(1)
+    return "A"
+}
+verify(ord(character()).eq(65))
+verify(state.calls.eq(1))
+print("ord checks passed")

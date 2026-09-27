@@ -313,7 +313,7 @@ func applyHeaders(target http.Header, value Value) error {
 			}
 			target.Set(key, v.String)
 		case ArrayKind:
-			for _, item := range v.Array {
+			for _, item := range v.elements() {
 				if item.Kind != StringKind {
 					return fmt.Errorf("header values must be strings")
 				}

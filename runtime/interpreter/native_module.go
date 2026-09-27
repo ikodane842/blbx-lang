@@ -42,11 +42,11 @@ func valueBytes(value Value) ([]byte, error) {
 	if value.Kind != ArrayKind {
 		return nil, fmt.Errorf("expected a string or byte array")
 	}
-	if len(value.Array) > stdOutputLimit {
+	if len(value.elements()) > stdOutputLimit {
 		return nil, fmt.Errorf("data exceeds 8 MiB")
 	}
-	data := make([]byte, len(value.Array))
-	for n, v := range value.Array {
+	data := make([]byte, len(value.elements()))
+	for n, v := range value.elements() {
 		if v.Kind != IntegerKind || v.Integer < 0 || v.Integer > 255 {
 			return nil, fmt.Errorf("byte %d must be an integer from 0 to 255", n)
 		}

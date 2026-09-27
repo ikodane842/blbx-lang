@@ -1,0 +1,62 @@
+import std.task as task
+import std.serialization as json
+verify = (condition) => {
+    if(condition.not(), () => { throw("array extend verification failed") })
+}
+items = [1, 2]
+alias = items
+verify(items.extend([3, 4]).eq(null))
+verify(alias.join(",").eq("1,2,3,4"))
+verify(items.length().eq(4))
+items.extend(items)
+verify(items.join(",").eq("1,2,3,4,1,2,3,4"))
+empty = []
+empty_alias = empty
+empty.extend([])
+empty.extend([5])
+verify(empty_alias[0].eq(5))
+holder = {"items": []}
+holder.items.extend([7])
+verify(holder.items[0].eq(7))
+nested = [[]]
+nested[0].extend([8])
+verify(nested[0][0].eq(8))
+source = [{"value": 1}]
+copy = []
+copy.extend(source)
+source[0].value = 2
+verify(copy[0].value.eq(2))
+copy.extend([9])
+verify(source.length().eq(1))
+verify(json.json_encode(empty).eq("[5]"))
+[first] = empty_alias
+verify(first.eq(5))
+empty_alias[0] = 6
+verify(empty[0].eq(6))
+unchanged = empty.append(7)
+verify(empty.length().eq(1))
+verify(unchanged.length().eq(2))
+
+expect_error = (work, code) => {
+    actual = try(work, (error) => { return error.code })
+    verify(actual.eq(code))
+}
+expect_error(() => { return items.extend(1) }, "BX4004")
+expect_error(() => { return items.extend() }, "BX4003")
+expect_error(() => { return items.extend([], []) }, "BX4003")
+expect_error(() => { return (1, 2).extend([]) }, "BX4002")
+verify(items.length().eq(8))
+
+// Worker aliases share mutations, but the caller remains isolated.
+worker = (pair) => {
+    pair[0].extend([42])
+    return pair[1]
+}
+shared = []
+job = task.spawn(worker, [shared, shared])
+result = task.await(job)
+verify(result[0].eq(42))
+verify(shared.length().eq(0))
+result.extend([43])
+verify(task.await(job).length().eq(1))
+print("array extend checks passed")

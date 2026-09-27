@@ -1,0 +1,73 @@
+// Same BLBX syntax on both backends:
+// blbx run examples/graph_execution.bx
+// blackbox run examples/graph_execution.bx
+verify = (condition) => {
+    if(condition.not(), () => { throw("graph execution verification failed") })
+}
+
+state = {"calls": 0, "order": []}
+touch = (label) => {
+    state.calls = state.calls.add(1)
+    state.order.extend([label])
+    return state.calls
+}
+
+// Both calls execute, even though neither return value is subsequently used.
+touch("discarded")
+unused = touch("assigned but unused")
+verify(state.calls.eq(2))
+verify(state.order.join(",").eq("discarded,assigned but unused"))
+
+// Unselected control paths do not execute their effects.
+if(false, () => { touch("wrong branch") })
+false.and(touch("wrong and").gt(0))
+true.or(touch("wrong or").gt(0))
+verify(state.calls.eq(2))
+
+// Repeated activation reads current state rather than a cached expression result.
+while(state.calls.lt(5), (cursor) => {
+    touch("loop")
+    if(cursor.idx().eq(0), () => { cursor.continue() })
+})
+verify(state.calls.eq(5))
+
+factorial = (n) => {
+    if(n.lte(1), () => { return 1 })
+    return n.mul(factorial(n.sub(1)))
+}
+verify(factorial(6).eq(720))
+
+class Counter {
+    history = []
+    (start) => { self.value = start }
+    next = () => {
+        self.value = self.value.add(1)
+        self.history.extend([self.value])
+        return self.value
+    }
+}
+a = Counter(0)
+b = Counter(10)
+alias = a
+bound = a.next
+bound()
+verify(alias.value.eq(1))
+verify(b.value.eq(10))
+verify(a.history.length().eq(1))
+verify(b.history.length().eq(0))
+
+// Reusing code never means sharing fresh allocations or closure parameters.
+make = (value) => { return () => { return value } }
+one = make(1)
+two = make(2)
+verify(one().eq(1))
+verify(two().eq(2))
+verify(one().eq(1))
+
+// Errors from calls with discarded results are still observable.
+caught = try(
+    () => { throw("unused-result error") return 99 },
+    (error) => { return error.value }
+)
+verify(caught.eq("unused-result error"))
+print("graph execution checks passed")

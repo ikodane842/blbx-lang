@@ -1,2 +1,10 @@
 /.gocache/
 /bin/
+
+# Local build and profiling artifacts
+/blackbox.exe
+/blbx
+/blackbox
+*.test
+*.prof
+coverage.out

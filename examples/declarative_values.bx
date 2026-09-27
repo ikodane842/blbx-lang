@@ -1,0 +1,43 @@
+// Run with blackbox run or blbx run. Inspect with blackbox graph.
+
+// Equivalent pure calculations can share a result within an activation.
+x = 10
+y = 20
+first = x.add(y)
+second = x.add(y)
+x = 40
+later = x.add(y)
+print(first, second, later) // 30 30 60
+
+// Assignments capture values; they are not reactive formulas.
+x = 2
+saved = x.add(3)
+x = 100
+print(saved) // 5
+
+// Runtime-produced scalar values can feed shared pure calculations.
+state = {"order": []}
+kind = typeof(state)
+print(kind.length(), kind.length())
+
+// Explicit calls execute even when their return values are discarded.
+touch = (value) => {
+    state.order.extend([value])
+    return value
+}
+touch(1)
+touch(2)
+pair = touch(3).add(touch(4))
+print(pair) // 7
+print(state.order.join(",")) // 1,2,3,4
+
+// Closures observe their captured environment when called.
+read_x = () => { return x.add(1) }
+x = 3
+print(read_x()) // 4
+x = 7
+print(read_x()) // 8
+
+// Only selected control-flow paths execute their effects.
+if(false, () => { touch(99) })
+print(state.order.join(",")) // 1,2,3,4

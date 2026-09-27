@@ -70,6 +70,11 @@ when the first item is an object. The assigned value and each index expression
 are evaluated once, with the right-hand value evaluated before the target.
 Array aliases observe indexed mutations.
 
+`items.extend(other_array)` also mutates the shared array, adding elements and
+returning `null`. Aliases observe its new length as well as its elements.
+`append` and `concat` continue to return new shallow arrays. See
+[array_extend.bx](../examples/array_extend.bx).
+
 String reads count Unicode code points. Negative string indices count from the
 end; out-of-range reads return null. Strings cannot be modified by indexing.
 Array/tuple out-of-range reads return null; their negative indices are not
@@ -142,6 +147,11 @@ to return a fresh iterator if the collection needs repeatable traversal.
 There is no implicit iterator cleanup/close callback or generator `yield` syntax.
 Inside a newly returned object literal, `self` refers to that literal; copy an
 outer receiver field into a variable first, as in the example.
+
+Array iteration reads the current array length on each step, so elements added
+with `extend` during iteration can also be visited. `while` provides the same
+cursor controls and counters, with `elem()` returning `null`; see
+[while_cursor.bx](../examples/while_cursor.bx).
 
 ## Interfaces
 

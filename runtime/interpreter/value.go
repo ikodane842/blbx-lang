@@ -37,7 +37,7 @@ type Value struct {
 	Integer   int64
 	Float     float64
 	String    string
-	Array     []Value
+	array     *[]Value
 	Object    map[string]Value
 	Function  *Function
 	Class     *Class
@@ -89,7 +89,14 @@ func String(v string) Value {
 }
 
 func Array(values []Value) Value {
-	return Value{Kind: ArrayKind, Array: values}
+	return Value{Kind: ArrayKind, array: &values}
+}
+
+func (v Value) elements() []Value {
+	if v.array == nil {
+		return nil
+	}
+	return *v.array
 }
 
 func Object(values map[string]Value) Value {
@@ -114,7 +121,7 @@ func (v Value) IsTruthy() bool {
 	case StringKind:
 		return v.String != ""
 	case ArrayKind, TupleKind:
-		return len(v.Array) > 0
+		return len(v.elements()) > 0
 	case ObjectKind, FunctionKind, ClassKind, InterfaceKind, ResourceKind:
 		return true
 	default:
@@ -147,7 +154,7 @@ func (v Value) Display() string {
 		return v.String
 	case ArrayKind, TupleKind:
 		parts := []string{}
-		for _, item := range v.Array {
+		for _, item := range v.elements() {
 			parts = append(parts, item.Display())
 		}
 		if v.Kind == TupleKind {
@@ -197,11 +204,11 @@ func (v Value) Equal(other Value) bool {
 	case StringKind:
 		return v.String == other.String
 	case TupleKind:
-		if len(v.Array) != len(other.Array) {
+		if len(v.elements()) != len(other.elements()) {
 			return false
 		}
-		for n, item := range v.Array {
-			if !item.Equal(other.Array[n]) {
+		for n, item := range v.elements() {
+			if !item.Equal(other.elements()[n]) {
 				return false
 			}
 		}
@@ -272,7 +279,7 @@ func (v Value) MarshalJSON() ([]byte, error) {
 		return json.Marshal(struct {
 			Kind  Kind    `json:"kind"`
 			Value []Value `json:"value"`
-		}{v.Kind, v.Array})
+		}{v.Kind, v.elements()})
 	case ObjectKind:
 		return json.Marshal(struct {
 			Kind  Kind             `json:"kind"`

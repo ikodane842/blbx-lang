@@ -9,6 +9,7 @@ const (
 	IteratorProtocol     = "BX4016"
 	InterfaceMismatch    = "BX3012"
 	InheritanceOrder     = "BX4017"
+	ShiftRange           = "BX4018"
 	SourceRead           = "BX0001"
 	UnknownCharacter     = "BX1001"
 	UnclosedString       = "BX1002"
@@ -62,6 +63,7 @@ func Codes() map[string]string {
 		IteratorProtocol:     "Invalid iterator protocol result",
 		InterfaceMismatch:    "Missing or incompatible interface method",
 		InheritanceOrder:     "Inconsistent multiple inheritance order",
+		ShiftRange:           "Bitwise shift count outside 0 through 63",
 		SourceRead:           "Source file read failure",
 		UnknownCharacter:     "Unknown source character",
 		UnclosedString:       "Unterminated string",

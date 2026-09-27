@@ -16,6 +16,8 @@ func checkNames(root ir.Node, tokens []lexer.LexerToken) []diagnostic.Diagnostic
 	classes := map[string]ir.Node{}
 	builtins := map[string]bool{"print": true, "input": true, "typeof": true, "if": true, "for": true, "while": true, "assert": true}
 	builtins["try"], builtins["throw"] = true, true
+	builtins["ord"] = true
+	builtins["ord"] = true
 	var bind func(ir.Node, map[string]bool)
 	bind = func(n ir.Node, names map[string]bool) {
 		if n.Type == ir.Identifier {

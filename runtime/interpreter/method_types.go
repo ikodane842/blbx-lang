@@ -20,6 +20,8 @@ func methodSignature(value Value, name string) (minimum, maximum int, available 
 		return 0, 0, true
 	case "eq", "neq":
 		return 1, 1, true
+	case "in":
+		return 1, 1, value.Kind == StringKind
 	case "to_int", "to_float":
 		return 0, 0, isNumeric(value) || value.Kind == StringKind
 	case "not":
@@ -30,6 +32,10 @@ func methodSignature(value Value, name string) (minimum, maximum int, available 
 		return 1, 1, isNumeric(value)
 	case "mod":
 		return 1, 1, value.Kind == IntegerKind
+	case "bit_and", "bit_or", "bit_xor", "shl", "shr", "ushr":
+		return 1, 1, value.Kind == IntegerKind
+	case "bit_not":
+		return 0, 0, value.Kind == IntegerKind
 	case "gt", "gte", "lt", "lte":
 		return 1, 1, isNumeric(value) || value.Kind == StringKind
 	case "indexes", "values":
@@ -63,6 +69,8 @@ func methodSignature(value Value, name string) (minimum, maximum int, available 
 	}
 	if value.Kind == ArrayKind {
 		switch name {
+		case "extend":
+			return 1, 1, true
 		case "join":
 			return 0, 1, true
 		case "append":

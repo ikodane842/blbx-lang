@@ -1,0 +1,77 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "BLBX",
+  "scopeName": "source.blbx",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#formatted-strings" },
+    { "include": "#strings" },
+    {
+      "match": "(?<![\\p{L}\\p{N}_.])(class|interface)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "captures": {
+        "1": { "name": "storage.type.blbx" },
+        "2": { "name": "entity.name.type.blbx" }
+      }
+    },
+    { "name": "keyword.control.blbx", "match": "(?<![\\p{L}\\p{N}_.])(?:return|assert|import|from|as|extends|implements|class|interface)(?![\\p{L}\\p{N}_])" },
+    { "name": "constant.language.blbx", "match": "(?<![\\p{L}\\p{N}_.])(?:true|false|null)(?![\\p{L}\\p{N}_])" },
+    { "name": "variable.language.blbx", "match": "(?<![\\p{L}\\p{N}_.])(?:self|super)(?![\\p{L}\\p{N}_])" },
+    { "name": "support.function.blbx", "match": "(?<![\\p{L}\\p{N}_.])(?:print|input|typeof|if|for|while|try|throw)(?![\\p{L}\\p{N}_])(?=\\s*\\()" },
+    { "name": "constant.numeric.blbx", "match": "(?<![\\p{L}\\p{N}_])[0-9]+(?:\\.[0-9]+)?" },
+    { "name": "entity.name.function.blbx", "match": "[\\p{L}_][\\p{L}\\p{N}_]*(?=\\s*=\\s*\\([^()]*\\)\\s*=>)" },
+    { "name": "entity.name.function.blbx", "match": "[\\p{L}_][\\p{L}\\p{N}_]*(?=\\s*\\()" },
+    { "name": "keyword.operator.blbx", "match": "=>|=|\\*\\*|\\*|\\.\\.\\." },
+    { "name": "punctuation.separator.blbx", "match": "[.,:]" },
+    { "name": "punctuation.section.blbx", "match": "[{}()\\[\\]]" },
+    { "name": "variable.other.blbx", "match": "[\\p{L}_][\\p{L}\\p{N}_]*" }
+  ],
+  "repository": {
+    "formatted-strings": {
+      "name": "string.quoted.double.interpolated.blbx",
+      "begin": "(?<![\\p{L}\\p{N}_])(f)(\")",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.blbx" },
+        "2": { "name": "punctuation.definition.string.begin.blbx" }
+      },
+      "end": "\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.blbx" } },
+      "patterns": [
+        { "name": "constant.character.escape.blbx", "match": "\\\\.|\\{\\{|\\}\\}" },
+        {
+          "begin": "\\{",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.blbx" } },
+          "end": "\\}",
+          "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.blbx" } },
+          "contentName": "meta.embedded.line.blbx",
+          "patterns": [
+            { "include": "#interpolation-braces" },
+            { "include": "$self" }
+          ]
+        },
+        { "name": "invalid.illegal.unescaped-brace.blbx", "match": "\\}" }
+      ]
+    },
+    "interpolation-braces": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.blbx" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.blbx" } },
+      "patterns": [
+        { "include": "#interpolation-braces" },
+        { "include": "$self" }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.blbx", "begin": "//", "end": "$" },
+        { "name": "comment.block.blbx", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.blbx",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.blbx", "match": "\\\\." }]
+    }
+  }
+}
